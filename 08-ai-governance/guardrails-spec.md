@@ -120,50 +120,29 @@ frameworks:
 
 ---
 
-## 7. ## 7. مخطّط بطاقة المصدر للتشريعات المتعارضة (Source-Card Schema)
+## 7. مخطّط بطاقة المصدر للتشريعات المتعارضة (Source-Card Schema)
 
-يُرفق بكل إجابة بطاقة/بطاقات مصدر محايدة. تعريف الحقول:
+يُرفق بكل إجابة بطاقة/بطاقات مصدر محايدة. المخطّط (JSON):
 
-| الحقل (key) | النوع (type) | الوصف |
-|---|---|---|
-| `source_id` | string | معرّف فريد للمصدر |
-| `type` | enum | تشريع / لائحة / حكم شرعي / سابقة قضائية / مرجع فقهي |
-| `title` | string | عنوان النص |
-| `issuing_reference` | string | مرجع إصدار **محايد** بلا أي وصف سياسي |
-| `article_or_section` | string | رقم المادة/البند |
-| `issue_date` | date \| null | بصيغة `YYYY-MM-DD` أو `null` إن لم يتوفّر |
-| `status_note` | enum | ساري / معدّل / متعارض-مع-نص-آخر |
-| `conflicts_with` | array | قائمة `source_id` للنصوص المتعارضة |
-| `neutrality_note` | string | تنويه: يُعرض دون ترتيب تفضيلي؛ التحقّق مسؤولية المختصّ |
-| `retrieval_score` | float | درجة الاسترجاع (RRF) |
-| `excerpt` | string | مقتطف حرفي من المصدر |
-
-**مثال (Schema — قيم إنجليزية للعرض السليم):**
-
-​
+```json
 {
-"source_id": "LAW-CIV-114",
-"type": "legislation",
-"title": "<statute title>",
-"issuing_reference": "<neutral issuing body, no political label>",
-"article_or_section": "Art. 114",
-"issue_date": "1992-03-29",
-"status_note": "conflicting",
-"conflicts_with": ["LAW-CIV-220"],
-"neutrality_note": "presented without preferential ranking",
-"retrieval_score": 0.87,
-"excerpt": "<verbatim excerpt>"
+  "source_id": "string — معرّف فريد",
+  "type": "تشريع | لائحة | حكم شرعي | سابقة قضائية | مرجع فقهي",
+  "title": "string — عنوان النص",
+  "issuing_reference": "string — مرجع إصدار محايد بلا وصف سياسي",
+  "article_or_section": "string — رقم المادة/البند",
+  "issue_date": "YYYY-MM-DD أو غير متوفّر",
+  "status_note": "ساري | معدّل | متعارض-مع-نص-آخر",
+  "conflicts_with": ["source_id ..."],
+  "neutrality_note": "يُعرض دون ترتيب تفضيلي؛ التحقّق مسؤولية المختصّ",
+  "retrieval_score": "float — درجة الاسترجاع (RRF)",
+  "excerpt": "string — مقتطف حرفي من المصدر"
 }
+```
 
-> **قاعدة:** عند `conflicts_with` غير فارغة (`!= []`)، تُعرض كل البطاقات المتعارضة **معاً** بترتيب `retrieval_score` لا بأي معيار سياسي.
-​
- بطاقة الإنشاء (تحديث الملف نفسه)
-| الحقل | القيمة |
-|---|---|
-| المسار (Path) | 08-ai-governance/guardrails-spec.md |
-| الإجراء | استبدال القسم §7 فقط |
-| الفرع (Branch) | docs/guardrails-spec-v0.1 |
-| رسالة الـ Commit | docs(ai-governance): reformat source-card schema for proper rendering |
+> **قاعدة:** عند `conflicts_with != []`، **تُعرض كل البطاقات المتعارضة معاً** بترتيب درجة الاسترجاع لا بأي معيار سياسي.
+
+---
 
 ## 8. اختبار الفريق الأحمر (Red-Teaming)
 
@@ -227,9 +206,20 @@ frameworks:
 ---
 
 ## سجل التغييرات (Document Change Log)
+
 | الإصدار | التاريخ | التغيير | الكاتب |
 |---|---|---|---|
 | 0.1 | 2026-06-21 | الإصدار الأولي: مبدأ الحياد، طبقات الدفاع، قيود الموجّه، الموضوعات الحسّاسة، ردود الرفض، بطاقة المصدر، خطة الفريق الأحمر، ربط OWASP | فريق الحوكمة (GRC) |
-| الإصدار | التاريخ | التغيير | الكاتب |
-|---|---|---|---|
-| 0.1 | 2026-06-21 | الإصدار الأولي: مبدأ الحياد، طبقات الدفاع، قيود الموجّه، الموضوعات الحسّاسة، ردود الرفض، بطاقة المصدر، خطة الفريق الأحمر، ربط OWASP | فريق الحوكمة (GRC) |
+
+---
+
+## بطاقة الإنشاء (Create Card)
+
+| الحقل | القيمة |
+|---|---|
+| المسار (Path) | `08-ai-governance/guardrails-spec.md` |
+| الإجراء | إنشاء الملف كاملاً |
+| الفرع (Branch) | `docs/guardrails-spec-v0.1` |
+| رسالة الـ Commit | `docs(ai-governance): add guardrails specification v0.1` |
+| المراجِع (Reviewer) | فريق الحوكمة (GRC) + SecDev |
+| الوسوم (Labels) | `ai-governance`, `security`, `guardrails` |
