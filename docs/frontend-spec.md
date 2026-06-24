@@ -1,124 +1,171 @@
 ---
-title: "مواصفة الواجهة (Frontend Spec) — المستشار القانوني الذكي"
+title: "مواصفة الواجهة الأمامية — المستشار القانوني الذكي"
 doc_id: ARC-FE-001
-version: 0.1
-owner: مالك النظام / المهندس المعماري
+version: 0.2
+owner: المهندس المعماري
 status: Draft
-approved_by: راعي المشروع
+approved_by: مالك النظام
 last_review: 2026-06-24
-next_review: 2026-12-24
-frameworks:
-  - { name: "Flutter App Architecture (MVVM)", status: مرجعي }
-  - { name: PDPL, status: محاذاة }
+next_review: 2026-09-24
+frameworks: []
 related:
-  - ARC-API-001     # عقد الواجهة (مصدر أحداث SSE)
-  - ARC-CONV-001    # اصطلاحات Dart واللغة
-  - AIG-GUARDRAILS-001
-  - GOV-ADR-001
+  - ARC-API-001    # عقد REST + SSE (مصدر الأحداث)
+  - ARC-CONV-001   # اصطلاحات Dart واللغة
+  - ARC-BRIEF-001  # موجز بناء الشريحة الأولى
+  - ARC-RAG-001    # خطّ أنابيب RAG (دلالات المراحل والمصادر)
 ---
 
-# مواصفة الواجهة
+# مواصفة الواجهة الأمامية (Frontend Spec)
 
-## 1. الغرض والنطاق
-تعرّف هذه الوثيقة بنية واجهة Flutter وتجربة المستخدم، وربطها بعقد
-`ARC-API-001`، وتُستخدم كـ **موجز بناءٍ (build brief)** يُسلَّم لمساعد الكود.
+## 1. النطاق والرؤية
+واجهةٌ لتطبيقٍ قانونيٍّ ذكيٍّ يعمل عبر RAG ويُعرض إجاباتٍ **مسنَدةً
+بالمصادر**. الجمهور: العموم (مواطن/محامٍ/قاضٍ). الأولوية لتجربة محادثةٍ
+سلسةٍ تشبه ChatGPT/Claude، مع **إشارات ثقةٍ قانونيةٍ غير قابلةٍ للتنازل**
+(المصادر، الإسناد، إخلاء المسؤولية).
 
-## 2. الحزمة التقنية للواجهة
-| المكوّن | الاختيار |
+| داخل النطاق (MVP) | خارج النطاق (لاحقاً) |
 | --- | --- |
-| الإطار | Flutter 3.x (Dart) |
-| إدارة الحالة | Riverpod |
-| المعمارية | Feature-First + MVVM |
-| قاعدة واجهة المحادثة | `flutter_gen_ai_chat_ui` (MIT) |
-| نقل البثّ | `flutter_client_sse` |
-| عرض Markdown | `flutter_markdown_plus` |
-| الشبكة | `dio` (مع interceptor للترويسة `X-User-Id`) |
-| التدويل | `flutter_localizations` + `intl` + ملفات `.arb` |
+| محادثةٌ متدفّقة (SSE) | رفع الملفات/الصور |
+| خانة مصادر + شارة إسناد | تسجيل دخولٍ حقيقي |
+| قائمة محادثات + إعدادات | إشعارات، مفضّلة، بحث داخلي |
+| RTL عربيٌّ أولاً | اختيار نوع المستخدم (مؤجّل للإعدادات) |
 
-## 3. البنية المعمارية (Feature-First)
-بوابة البيانات الوحيدة هي الـ repository، والتدفّق أحاديّ الاتجاه من
-الطبقة data إلى presentation عبر view-models (Riverpod).
+## 2. الحزمة التقنية
+​
+dependencies:
+flutter_riverpod: ^2.5.0          # state management
+flutter_gen_ai_chat_ui: ^2.14.0   # chat UI base (MIT)
+flutter_client_sse: ^2.0.0        # SSE transport (Http impl)
+flutter_markdown_plus: ^1.0.0     # markdown rendering
+dio: ^5.4.0                       # http client + interceptors
+intl: ^0.19.0                     # i18n
+flutter_localizations:
+sdk: flutter
+
+## 3. البنية المعمارية
+- **Feature-First + MVVM** (الموصى به رسمياً من فريق Flutter).
+- **Riverpod** لإدارة الحالة (قابلٌ للتركيب والاختبار).
+- **Repository pattern**: واجهةٌ مجرّدةٌ تُخفي مصدر البيانات؛ تبديل
+  Mock ↔ Http لا يلمس طبقة العرض.
+- **Contract-First**: نبني الواجهة على عقد `ARC-API-001` عبر mock قبل
+  اكتمال الـ backend.
+- الحزمة الخارجية **معزولةٌ خلف طبقة العرض**؛ نماذج المجال مستقلّةٌ عنها
+  (mapping عند الحدود) لتبقى قابلةً للاستبدال.
+
+## 4. بنية المجلّدات
 ​
 lib/
 core/
-network/      # dio client, sse client, X-User-Id interceptor
-theme/        # colors, typography, RTL (palette pending)
-l10n/         # .arb resource files (ar primary)
-router/       # go_router
-widgets/      # shared widgets
+network/        # dio client, sse parser, X-User-Id interceptor
+theme/          # app_theme.dart (brand tokens)
+l10n/           # arb files (ar primary, en secondary)
+router/         # navigation
+widgets/        # shared widgets (disclaimer banner, etc.)
 features/
 chat/
-data/         # repository, dto, sse_event_parser
-domain/       # Message, SourceRef, StreamStatus models
-application/  # chat_controller (Riverpod notifier)
-presentation/ # chat_screen, message_bubble, sources_box,
-grounding_badge, status_indicator
+data/         # chat_repository.dart, mock/http impls, dtos
+domain/       # chat_message_model.dart, source_ref.dart, chat_event.dart
+application/  # chat_controller.dart (Riverpod notifier)
+presentation/ # chat_screen.dart + widgets/
 conversations/
 data/ domain/ application/ presentation/
 settings/
-presentation/ # user_type selection (deferred here)
+data/ domain/ application/ presentation/
 main.dart
 
-## 4. استراتيجية البناء (Contract-First)
-- نبني الواجهة على **mock server** يحاكي `ARC-API-001` (REST + SSE)،
-  فيتقدّم الـ frontend بالتوازي مع الـ backend دون انحراف (drift).
-- طبقة repository مجرّدة: `ChatRepository` لها تطبيقٌ `MockChatRepository`
-  وآخر `HttpChatRepository`، يُبدَّلان عبر Riverpod provider.
+## 5. استراتيجية العقد والـ Mock
+​
++-------------------+
+ChatRepository
+(abstract, domain-owned)
++-------------------+
+^               ^
++---------------------+  +----------------------+
+MockChatRepository
+HttpChatRepository
+(scripted SSE)
+(flutter_client_sse)
++---------------------+  +----------------------+
+- نبدأ بـ `MockChatRepository` يبثّ تسلسل `status -> token -> sources -> done`.
+- لاحقاً نُمرّر `HttpChatRepository` المتّصل بـ `POST /v1/conversations/{id}/messages`.
+- طبقة العرض لا تعرف أيّهما يُستخدم (حقن عبر Riverpod provider).
 
-## 5. الشاشات (MVP)
-| الشاشة | الوظيفة |
+## 6. شاشات الـ MVP
+| الشاشة | المحتوى الأساسي |
 | --- | --- |
-| Chat | المحادثة، البثّ، خانة المصادر، شارة الإسناد |
-| Conversations | قائمة المحادثات السابقة + «محادثة جديدة» |
-| Settings | تبديل اللغة، **اختيار نوع المستخدم** (مؤجّل هنا)، التنويه |
+| **المحادثة** | البثّ، خانة المصادر، شارة الإسناد، تبويب النسختين، زرّ الإيقاف |
+| **قائمة المحادثات** | درج جانبي + محادثة جديدة/حذف |
+| **الإعدادات** | اللغة، نوع المستخدم (مؤجّل)، إخلاء المسؤولية |
 
-## 6. ربط أحداث SSE بالواجهة
-| حدث SSE (ARC-API-001) | عنصر الواجهة |
-| --- | --- |
-| `status` | **مؤشّر المراحل**: تحليل → بحث → إعادة ترتيب → صياغة |
-| `token` | إلحاق الرمز بفقاعة الرد المتدفّقة (مع مؤشّر كتابة) |
-| `sources` | تعبئة **خانة المصادر** القابلة للطيّ |
-| `done` | إنهاء الرد + ضبط **شارة الإسناد** من `is_grounded` |
-| `error` | حالة خطأ + زرّ إعادة المحاولة |
+حالاتٌ داخل شاشة المحادثة: فارغة/ترحيبية باقتراحات، معالجة (مؤشّر مراحل)،
+خطأ/إعادة محاولة.
 
-## 7. مكوّنات تجربة المستخدم المعتمَدة
+## 7. خريطة أحداث SSE → الواجهة
+| الحدث | الحقل | الأثر في الواجهة |
+| --- | --- | --- |
+| `status` | `stage` | مؤشّر المراحل (تحليل → بحث → إعادة ترتيب → صياغة) |
+| `token` | `text` | إلحاقٌ للفقاعة المتدفّقة |
+| `sources` | `sources[]` | خانة مصادرٍ قابلةٌ للطيّ |
+| `done` | `is_grounded` | إنهاء + شارة الإسناد |
+| `error` | `code`,`message` | رسالة خطأ + إعادة محاولة |
+
+## 8. مكوّنات تجربة المستخدم
 | المكوّن | القرار |
 | --- | --- |
-| خانة المصادر | **قابلة للطيّ** أسفل كل ردّ (قانون/مادة/نسخة/مقتطف) |
-| شارة الإسناد | مسنَد ✅ / غير مسنَد ⚠️ لكل ردّ |
-| النسختان | تبويبٌ متساوٍ (أصلية/معدّلة-صنعاء) دون ترجيح |
-| التنويه | دائمٌ (ليست استشارةً قانونية) |
-| مؤشّر الانتظار | **مراحل ذات معنى** (لا دوّار صامت) — لإدارة زمن ~15s |
-| الاتجاه | **RTL عربيٌّ أولاً**؛ مصطلحات تقنية LTR مضمّنة |
-| نوع المستخدم | يُختار من **الإعدادات لاحقاً** (لا onboarding إلزامي) |
-| رفع الملفات/الصور | **غير مدعوم** في الـ MVP |
+| خانة المصادر | قابلةٌ للطيّ أسفل كلّ ردّ؛ لكل مصدر: القانون/المادة/النسخة/المقتطف |
+| شارة الإسناد | مسنَد ✅ / غير مسنَد ⚠️ مدفوعةٌ بـ `is_grounded` |
+| تبويب النسختين | عرض النسختين (original / sanaa_amended) بالتساوي دائماً |
+| إخلاء المسؤولية | بانر دائمٌ ثابت (ليس استشارةً قانونيةً ملزِمة) |
+| مؤشّر المراحل | مراحل ذات معنى بدل الدوّار الصامت (العدوّ هو زمن ~15ث) |
+| RTL | عربيٌّ أولاً، بثٌّ بالكلمة العربية |
+| رفع الملفات | غير مدعومٍ في MVP |
+| نوع المستخدم | يُحدَّد لاحقاً ضمن الإعدادات |
 
-## 8. التدويل و RTL
-- اللغة الأساسية العربية (RTL تلقائي عبر `Directionality`).
-- **يُمنع** تضمين نصوصٍ عربية صلبةً؛ كلّها في ملفات `.arb` (ARC-CONV-001).
+## 9. الثيم والهوية البصرية (v0.2)
+> المصدر: دليل الهوية الرسمي. الطابع **أحادي اللون، داكنٌ أولاً**.
+> الشعار = ميزان العدل + رأس الجنبية المقلوبة (يُستخدم كصورة asset، لا كخطّ).
 
-## 9. الثيم (Theming)
-- placeholder حتى تزويد **لوحة الألوان** من مالك المشروع.
-- يُبنى عبر `ThemeData` مركزيّ في `core/theme/` لتبديلٍ لاحقٍ بلا تعديلٍ موزّع.
+### 9.1 رموز الألوان (Design Tokens)
+| الرمز | القيمة | الاستخدام |
+| --- | --- | --- |
+| brandBlack | `#121212` | الأساس / الخلفية الداكنة / الشعار |
+| brandOffWhite | `#f5f4f5` | السطح الفاتح / النصّ على الداكن |
+| darkSurface | `#1C1C1C` | أسطح البطاقات (داكن) |
+| lightSurface | `#FFFFFF` | أسطح البطاقات (فاتح) |
+| grounded (light/dark) | `#1F7A4D` / `#4CAF7D` | شارة «مسنَد» |
+| ungrounded (light/dark) | `#B23A3A` / `#E57373` | شارة «غير مسنَد» |
+| warning (light/dark) | `#8A6D00` / `#D4A72C` | تنبيهات |
 
-## 10. موجز البناء لمساعد الكود (Build Brief)
-1. ابدأ من `flutter_gen_ai_chat_ui` كقاعدةٍ لشاشة المحادثة والبثّ وMarkdown.
-2. أضف **خانة المصادر** القابلة للطيّ المرتبطة بحدث `sources`.
-3. أضف **شارة الإسناد** المرتبطة بـ `is_grounded` في حدث `done`.
-4. استبدل مؤشّر الانتظار الافتراضي بمؤشّر **مراحل** مدفوعٍ بحدث `status`.
-5. طبّق طبقة `ChatRepository` المجرّدة مع mock يحاكي `ARC-API-001`.
-6. فعّل RTL والتدويل عبر `.arb` دون أي نصٍّ عربيٍّ صلب.
-7. مرّر ترويسة `X-User-Id` عبر interceptor في `dio`.
+### 9.2 الخطّ
+| البند | القرار |
+| --- | --- |
+| خطّ الواجهة | **IBM Plex Sans Arabic** (OFL، مجاني للتضمين التجاري) |
+| خطّ الشعار | Hacen Tunisia Lt — كصورةٍ ثابتةٍ فقط (لا تضمين) |
+| سبب العدول عن Hacen في الواجهة | ترخيصه متضاربٌ/غير مؤكَّد للتضمين الموزَّع (علم GRC) |
+
+### 9.3 الوضع والسلوك
+- `ThemeMode.system` افتراضياً (معيار تطبيقات الدردشة)، مع نسختين فاتحة/داكنة.
+- الألوان الوظيفية مكتومةٌ ومتكيّفةٌ مع الثيم، وتحقّق تباين WCAG AA.
+- ألوان الإسناد مُعرَّفةٌ عبر `ThemeExtension<SemanticColors>` لا ثوابت صلبة.
+- RTL يُدار عبر `Directionality`/`Localizations`، لا عبر `ThemeData`.
+
+### 9.4 بنود امتثالٍ مفتوحة
+- توثيق ترخيص IBM Plex (OFL) في سجل الأصول البرمجية (Tier-3).
+- إن لزم Hacen في الواجهة لاحقاً: شراء ترخيص embedding رسمي من hacen.net.
+
+## 10. موجز البناء لـ Claude
+الشريحة الأولى (شاشة المحادثة + mock + SSE كامل) موثّقةٌ تفصيلاً في
+`ARC-BRIEF-001` (مسار `docs/briefs/slice-01-chat-skeleton.md`)، وتشمل
+نماذج المجال، عقد الأحداث، سلوك الـ mock، ونقاط توسعة الحزمة.
 
 ## 11. القرارات المفتوحة
-| # | البند | الحالة |
-| --- | --- | --- |
-| 1 | لوحة ألوان الثيم | تُطلب من مالك المشروع عند التنفيذ |
-| 2 | `go_router` مقابل تنقّلٍ أبسط | يُحسم عند بناء التنقّل |
-| 3 | حدّ ارتفاع خانة المصادر قبل التمرير | يُضبط تجريبياً |
-
-## 12. سجل التغييرات
-| الإصدار | التاريخ | الوصف |
-| --- | --- | --- |
-| 0.1 | 2026-06-24 | المسودّة الأولى لمواصفة الواجهة + موجز البناء |
+| القرار | الحالة |
+| --- | --- |
+| لغة برومبت المولِّد (عربي/إنجليزي) | تُحسم تجريبياً (ARC-PROMPT-001) |
+| بُعد التضمين (768 مقابل 1024) | معلّقٌ حتى تثبيت المضمِّن |
+| blind index للبحث بالهاتف | مفتوح (SEC-CRYPTO-001) |
+| اختيار نوع المستخدم | مؤجّلٌ للإعدادات |
+| ترخيص خطّ الشعار في الواجهة | افتراضياً asset؛ شراءٌ رسميٌّ إن لزم |
 ​
+هذه النسخة الكاملة جاهزةٌ للاستبدال المباشر. ما إن تعتمدها، يبقى لدينا تسليم الشريحة الأولى لـ Claude ثم مراجعة الكود مقابل معايير القبول.
+
