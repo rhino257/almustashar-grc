@@ -1,6 +1,6 @@
 ---
-title: "المعمارية التقنية — المستشار القانوني الذكي"
-doc_id: ARC-DESIGN-001
+title: "نموذج البيانات — المستشار القانوني الذكي"
+doc_id: ARC-DATA-001
 version: 0.1
 owner: مالك النظام / المدير التقني
 status: Draft
@@ -8,135 +8,185 @@ approved_by: راعي المشروع
 last_review: 2026-06-24
 next_review: 2026-12-24
 frameworks:
-  - { name: ISO/IEC 42001, status: محاذاة }
-  - { name: OWASP Top 10 for LLM, status: مُطبّق }
-  - { name: NCS-1, status: مرجعي }
   - { name: PDPL, status: محاذاة }
+  - { name: ISO/IEC 27701, status: محاذاة }
+  - { name: NCS-1, status: مرجعي }
 related:
-  - GOV-ADR-001  # سجل القرارات التقنية
-  - ARC-DATA-001 # نموذج البيانات (لاحقاً)
-  - ARC-RAG-001  # مواصفة خط RAG (لاحقاً)
+  - ARC-DESIGN-001  # المعمارية التقنية
+  - GOV-ADR-001     # سجل القرارات التقنية
 ---
 
-# المعمارية التقنية — المستشار القانوني الذكي
+# نموذج البيانات — المستشار القانوني الذكي
 
 ## 1. الغرض والنطاق
-هذه الوثيقة تصف المعمارية التقنية الكاملة للنسخة الأولى (MVP) من «المستشار
-القانوني الذكي»: مساعدٌ قانونيٌّ يعمل محلياً (On-Prem) داخل اليمن، يجيب على
-أسئلة المستخدم بإجاباتٍ **مُسنَدةٍ إلى مصادر قانونية** عبر منظومة RAG.
-النطاق هنا = الأساسيات التي تسمح بإطلاقٍ أوّليٍّ بلا أخطاء: سؤال/جواب مسنَد،
-جلسات محفوظة، ذاكرة داخل المحادثة، وتغذية راجعة. وما عداه (الدفع، رفع
-الوثائق، التحقّق من الهوية، واجهات إدارة النصوص) خارج نطاق هذه النسخة.
+تصف هذه الوثيقة مخطّط قاعدة البيانات (PostgreSQL + pgvector) للنسخة الأولى:
+الجداول، الأعمدة، العلاقات، الفهارس، عزل الصفوف (RLS)، الحذف، وتصنيف
+البيانات. الهدف: مخطّطٌ يكفي لإطلاق سؤال/جواب مسنَد بذاكرةٍ داخل المحادثة،
+ملتزمٌ بالحد الأدنى من البيانات (PDPL).
 
-## 2. المبادئ المعمارية الحاكمة
-- **On-Prem كامل:** كل المكوّنات على بنية «سحبكم» (sohobcom) اليمنية، بلا
-  أي خدمة خارجية (مطابقة GOV-ADR-001).
-- **مصدرٌ واحد، عرضٌ متعدّد:** نفس المصادر القانونية للجميع؛ يختلف العرض
-  (النبرة/العمق) حسب نوع المستخدم لا المضمون القانوني.
-- **الإسناد إلزامي:** لا إجابة قانونية بلا سندٍ كافٍ؛ والإجابة غير المسنَدة
-  تُوسَم وتُسجَّل.
-- **الحياد طبقة فحص:** الحياد السياسي مُطبَّقٌ كعقدةٍ برمجيةٍ في الـ pipeline
-  لا كتعليمةٍ في الـ prompt فقط.
-- **البرمجة على واجهة:** المكوّنات الحسّاسة (التشفير، محرّك النموذج) خلف
-  واجهاتٍ مجرّدة قابلةٍ للاستبدال دون إعادة هيكلة.
+## 2. المبادئ الحاكمة للمخطّط
+- **نطاقان منفصلان:** (أ) بيانات التطبيق ينشئها المستخدم، (ب) قاعدة المعرفة
+  القانونية. الأولى نصمّمها كاملةً، والثانية نُحاذي ما هو موجودٌ لديك.
+- **الحد الأدنى من البيانات:** لا هوية وطنية؛ فقط ما يلزم للخدمة.
+- **العزل الافتراضي:** RLS صارمٌ يمنع تسرّب بياناتٍ بين المستخدمين.
+- **الحذف حقٌّ أصيل:** `ON DELETE CASCADE` يجعل حذف الحساب يمحو كل أثره.
+- **استراتيجية لغة التضمين:** يُخزَّن النص العربي للعرض، والإنجليزي للتضمين.
 
-## 3. نظرة معمارية عامة
+## 3. مخطّط الكيانات والعلاقات (ERD)
 ​
-+------------------------+
-Flutter mobile app
-(chat UI, SSE client)
-+-----------+------------+
-HTTPS / TLS 1.2+
-v
-+------------------------+
-FastAPI gateway
-auth (guest UUID now)
-+-----------+------------+
-v
-+------------------------+
-LangGraph orchestrator
-(RAG + neutrality)
-+--+------------------+--+
-embeddings   |                  |  generation
-v                  v
-+------------------+   +------------------+
-embeddings svc
-vLLM (prod)
-(self-hosted)
-Gemma 4 31B Q4
-+------------------+   +------------------+
-v
-+-----------------------------+
-PostgreSQL + pgvector
-app data + knowledge base
-+-----------------------------+
-Infra: sohobcom (Yemen) | 1x NVIDIA H100 80GB | OTP: Al-Awael (disabled)
+users 1--- conversations 1--- messages 1---* message_sources
+*---1 feedback (per message)
+legal_documents 1--- legal_articles 1--- legal_chunks
+^
++--+ variant_of (self-reference: amended <-> original)
+message_sources *---1 legal_articles   (citation link, when available)
 
-## 4. المكدّس التقني المعتمد
-| الطبقة | التقنية المعتمدة | ملاحظة |
+## 4. نطاق (أ): جداول التطبيق
+​
+-- enable UUID generation (pgcrypto) before running this script.
+CREATE TABLE users (
+id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+phone_enc    TEXT,        -- reversible-encrypted via CryptoService; NULL until OTP active
+user_type    TEXT NOT NULL DEFAULT 'citizen',  -- citizen|lawyer|judge|researcher|bank
+profession   TEXT,
+governorate  TEXT,
+created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE conversations (
+id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+title       TEXT,
+created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_conversations_user ON conversations(user_id);
+CREATE TABLE messages (
+id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+conversation_id  UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+role             TEXT NOT NULL CHECK (role IN ('user','assistant')),
+content          TEXT NOT NULL,
+is_grounded      BOOLEAN,   -- NULL for user msgs; TRUE=sourced, FALSE=model-belief
+created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_messages_conversation ON messages(conversation_id);
+CREATE TABLE message_sources (
+id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+message_id  UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+article_id  UUID REFERENCES legal_articles(id),  -- link to KB when available
+law_name    TEXT,
+article     TEXT,
+variant     TEXT,          -- original|sanaa_amended
+source_ref  TEXT,
+snippet     TEXT,
+score       REAL,
+rank        INT
+);
+CREATE INDEX idx_message_sources_message ON message_sources(message_id);
+CREATE TABLE feedback (
+id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+message_id  UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+rating      TEXT NOT NULL CHECK (rating IN ('up','down')),
+comment     TEXT,
+created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+| الجدول | الغرض | ملاحظة |
 | --- | --- | --- |
-| الواجهة | Flutter (mobile-first), Google Play | بثّ SSE + مؤشّر حالة متدرّج |
-| البوابة | FastAPI | نقاط نهاية + SSE streaming |
-| التنسيق | LangGraph | عقد: contextualize, retrieve, neutrality, generate, guard |
-| النموذج | Gemma 4 31B Dense, QAT 4-bit (Q4_0) | vLLM للإنتاج, Ollama للتطوير |
-| صيغة vLLM | W4A16 / AWQ | لا تُستخدم GGUF Q4_0 مع vLLM |
-| التضمين | translate->EN ثم embed (انظر §9) | استثناء مُسجَّل |
-| القاعدة | PostgreSQL + pgvector (self-hosted) | RLS صارم + حذف متتالٍ |
-| البنية | sohobcom On-Prem, 1x H100 80GB | تزامن ~50 + طابور |
+| `users` | الحد الأدنى من بيانات المستخدم | `phone_enc` مشفّرٌ قابلٌ للفكّ؛ لا هوية وطنية |
+| `conversations` | الجلسات المحفوظة على الـ UUID | حذفٌ متتالٍ عند حذف المستخدم |
+| `messages` | رسائل المحادثة + علم الإسناد | `is_grounded` سجلّ الإجابات غير المسنَدة |
+| `message_sources` | خانة «المصادر» تحت كل رسالة | `variant` و`article_id` يربطان بقاعدة المعرفة |
+| `feedback` | تغذية المجموعة الذهبية | مرتبطٌ بالرسالة لا بالمستخدم (تقليل الربط) |
 
-## 5. تدفّق الطلب من السؤال إلى الإجابة المسنَدة
+## 5. نطاق (ب): قاعدة المعرفة القانونية
 ​
-event: status   data: "reading question"     <- contextualize node (memory)
-event: status   data: "searching statutes"   <- retrieve node (pgvector + RRF)
-event: status   data: "comparing texts"      <- neutrality node (variant pairing)
-event: status   data: "drafting answer"       <- generate node (Gemma via vLLM)
-event: token    data: "..."                   <- streamed answer tokens
-event: sources  data: [ {law, article, variant, ref} ]   <- message_sources
-كل حالةٍ مربوطةٌ بعقدةٍ حقيقيةٍ في LangGraph (لا مؤقّتات وهمية)، فتُعبّر
-الواجهة عن التنفيذ الفعلي وتفيد في التشخيص.
+CREATE TABLE legal_documents (
+id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+doc_type     TEXT,        -- law|regulation|sharia_ref|ruling_principle
+title        TEXT NOT NULL,
+source_ref   TEXT,
+issued_date  DATE
+);
+CREATE TABLE legal_articles (
+id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+document_id  UUID NOT NULL REFERENCES legal_documents(id),
+article_no   TEXT,
+content_ar   TEXT NOT NULL,   -- original Arabic text (returned to the user)
+content_en   TEXT,            -- English translation (used for embedding only)
+variant      TEXT,            -- original|sanaa_amended
+variant_of   UUID REFERENCES legal_articles(id)  -- links amended <-> original
+);
+CREATE INDEX idx_legal_articles_document  ON legal_articles(document_id);
+CREATE INDEX idx_legal_articles_variantof ON legal_articles(variant_of);
+CREATE TABLE legal_chunks (
+id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+article_id   UUID NOT NULL REFERENCES legal_articles(id) ON DELETE CASCADE,
+chunk_index  INT NOT NULL,
+content_en   TEXT NOT NULL,   -- English chunk that gets embedded
+embedding    vector(1024),    -- DIMENSION PENDING final embedding-model decision
+token_count  INT
+);
+-- ANN index, create AFTER the embedding model/dimension is fixed:
+-- CREATE INDEX idx_legal_chunks_embedding
+--   ON legal_chunks USING hnsw (embedding vector_cosine_ops);
 
-## 6. طبقة الحياد السياسي
-عند وجود نصٍّ له نسختان (أصلي / معدَّل صنعاء)، تُرجع عقدة الحياد **النسختين
-بالتساوي** عبر حقل `variant` ورابط `variant_of` في قاعدة المعرفة. الحياد
-قرارٌ معماريٌّ مُجمَّد لا يُترك لصياغة الـ prompt.
+| الجدول | الغرض | ملاحظة |
+| --- | --- | --- |
+| `legal_documents` | القانون/اللائحة/المرجع | الكيان الأعلى |
+| `legal_articles` | المواد بنسختيها | `content_ar` للعرض، `content_en` للتضمين؛ `variant_of` يقرن المعدَّل بالأصلي (جوهر الحياد) |
+| `legal_chunks` | المقاطع المُضمَّنة | التضمين على الإنجليزية؛ الاسترجاع يُرجع العربية عبر `article_id` |
 
-## 7. نموذج البيانات (مرجع موجز)
-نطاقان: (أ) بيانات التطبيق: `users, conversations, messages, message_sources,
-feedback`؛ (ب) قاعدة المعرفة: `legal_documents, legal_articles, legal_chunks`.
-التفصيل الكامل في `ARC-DATA-001` (data-model.md).
+## 6. عزل الصفوف (Row-Level Security)
+​
+ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE messages       ENABLE ROW LEVEL SECURITY;
+CREATE POLICY conv_isolation ON conversations
+USING (user_id = current_setting('app.current_user_id')::uuid);
+CREATE POLICY msg_isolation ON messages
+USING (conversation_id IN (
+SELECT id FROM conversations
+WHERE user_id = current_setting('app.current_user_id')::uuid));
+يضبط الـ backend المتغيّر `app.current_user_id` لكل طلبٍ من الـ UUID الموثَّق،
+فلا يصل أيّ مستخدمٍ إلا لصفوفه.
 
-## 8. الأمن والامتثال
-- **النقل:** TLS 1.2+ على كل الواجهات (موصى به منذ الإطلاق).
-- **التشفير الساكن:** مؤجَّل مع بنيةٍ جاهزة (`CryptoService` + `NullCipher`
-  مبدئياً، قابلٌ لاستبدال `AesGcmCipher`)؛ مُسجَّل استثناءً.
-- **رقم الهاتف:** هدفه تشفيرٌ قابلٌ للفكّ (يراه المسؤول)؛ مبدئياً عبر
-  `CryptoService` دون تشفيرٍ فعليٍّ بعد.
-- **رمز OTP:** يُجزَّأ (hash) ولا يُخزَّن نصاً (الميزة معطّلة حالياً).
-- **العزل:** RLS صارم — كل مستخدمٍ يرى محادثاته فقط.
-- **الحذف:** حذف محادثة/حساب متاحٌ من اليوم الأول (PDPL) عبر `ON DELETE
-  CASCADE`.
-- **الحواجز:** فلترة المدخلات (حقن الأوامر) والمخرجات (تسريب PII) وفق
-  guardrails-spec (AIG-GUARDRAILS-001).
+## 7. التشفير وحماية الحقول
+- `users.phone_enc`: يمرّ عبر `CryptoService` (الهدف: AES-256 قابل للفكّ؛
+  مبدئياً `NullCipher`). العمود من نوع `TEXT` بحجمٍ يكفي النصّ المشفّر، فلا
+  يلزم تعديل المخطّط عند تفعيل التشفير لاحقاً.
+- رمز OTP (عند تفعيله): يُخزَّن **مجزّأً (hash)** في جدولٍ منفصلٍ قصير العمر،
+  ولا يُحفظ نصّاً إطلاقاً.
+- لا تُسجَّل بيانات شخصية في اللوقات (logging-standard).
 
-## 9. القيود والقرارات المفتوحة
+## 8. الحذف والاحتفاظ (PDPL)
+- تُحفظ المحادثات حتى يحذفها المستخدم أو يُغلق حسابه.
+- حذف الحساب = حذف صفّ `users`؛ والـ `ON DELETE CASCADE` يمحو تلقائياً
+  `conversations` و`messages` و`message_sources` و`feedback`.
+- لا نستخدم الحذف الناعم (soft-delete) للبيانات الشخصية كي لا نخالف مبدأ
+  الحذف الفعلي.
+
+## 9. تصنيف البيانات
+| الجدول/الحقل | التصنيف |
+| --- | --- |
+| `users.phone_enc` | سرّي |
+| `users` (نوع/مهنة/محافظة) | داخلي |
+| `conversations.title` | سرّي |
+| `messages.content` | سرّي |
+| `message_sources` (نصوص قانونية) | عام (الربط داخلي) |
+| `feedback` | داخلي |
+| `legal_*` (النصوص القانونية) | عام |
+
+## 10. القرارات المفتوحة
 | # | البند | الحالة |
 | --- | --- | --- |
-| 1 | استراتيجية التضمين = ترجمة->إنجليزي | مُعتمدة (قرار المالك)؛ خطرٌ مُسجَّل: انحراف الترجمة القانونية. مخفِّف إلزامي: قياس الدقّة على المجموعة الذهبية بعد التنفيذ |
-| 2 | بُعد VECTOR | معلّق حتى يُحسم نموذج التضمين النهائي |
-| 3 | التشفير الفعلي | مؤجَّل؛ يُعاد تفعيله قبل ربط OTP/الدفع |
-| 4 | خوارزمية الاسترجاع | تصميم المالك؛ تُوثّق في ARC-RAG-001 |
-
-## 10. معايير قبول الإطلاق (من GOV-ADR-001)
-| المعيار | الحد |
-| --- | --- |
-| دقّة الإجابات | >= 80% |
-| زمن الاستجابة | <= 15 ثانية |
-| معدّل الأعطال | < 5% |
-| التحمّل | ~50 متزامناً + طابور (خُفّض من 500 للتجريبية) |
+| 1 | بُعد `vector(n)` | مثبّت مبدئياً 1024؛ يُحسم نهائياً مع نموذج التضمين |
+| 2 | جدول `otp_codes` | يُضاف عند تفعيل ميزة OTP |
+| 3 | فهرس HNSW مقابل IVFFlat | يُحسم بعد قياس حجم القاعدة وأداء الاسترجاع |
+| 4 | جودة `content_en` | تعتمد على جودة الترجمة (خطر مُسجَّل في ARC-DESIGN-001 §9) |
 
 ## 11. سجل التغييرات
 | الإصدار | التاريخ | الوصف | المعتمِد |
 | --- | --- | --- | --- |
-| 0.1 | 2026-06-24 | المسودّة الأولى مبنيّةً على المحاور الثمانية المتّفق عليها | — (Draft) |
+| 0.1 | 2026-06-24 | المسودّة الأولى لنموذج البيانات (تطبيق + معرفة) | — (Draft) |
 ​
-هذا الملف مسودّة (Draft) على فرع draft/architecture؛ لا يصبح معتمداً إلا بعد مراجعتك ودمجه في main.
+اكتملت وثيقتان من الطبقة الأولى (architecture.md + data-model.md)، وكلاهما مسودّة على فرعها. لاحظ أنّ legal_articles يجسّد استراتيجيتك بدقّة: عربيٌّ يُعرَض، إنجليزيٌّ يُضمَّن.
+ما الوثيقة التالية؟
