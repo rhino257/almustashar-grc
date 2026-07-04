@@ -88,6 +88,8 @@ h3 {
 /* ===== الفقرات والمواد ===== */
 p { margin: 0.28cm 0; }
 p strong:first-child { color: #0b3d2e; }
+/* فصل عنوان المادة (النص الغامق) عن نص المادة لمنع تداخل الكلمات في تصيير RTL بمحرك WeasyPrint */
+p strong:first-child::after { content: "\00A0"; }
 
 /* ===== الاقتباس (الديباجة) ===== */
 blockquote {
