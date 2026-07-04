@@ -1,11 +1,11 @@
 ---
 title: "نموذج البيانات — المستشار القانوني الذكي"
 doc_id: ARC-DATA-001
-version: 0.3
+version: 0.4
 owner: مالك النظام / المدير التقني
 status: Draft
 approved_by: راعي المشروع
-last_review: 2026-07-02
+last_review: 2026-07-04
 next_review: 2026-12-24
 frameworks:
   - { name: PDPL, status: محاذاة }
@@ -25,17 +25,25 @@ related:
 تصف هذه الوثيقة مخطّط قاعدة البيانات (PostgreSQL + pgvector) للنسخة الأولى:
 الجداول، الأعمدة، العلاقات، الفهارس، عزل الصفوف (RLS)، الحذف، وتصنيف
 البيانات. الهدف: مخطّطٌ يكفي لإطلاق سؤال/جواب مسنَد بذاكرةٍ داخل المحادثة،
-مع مصادقةٍ بهاتف+كلمة مرور+OTP، ملتزمٌ بالحد الأدنى من البيانات (PDPL)،
-ومهيّأٌ لخط أنابيب الاسترجاع الهجين.
+مع مصادقةٍ بهاتف+كلمة مرور+OTP (تفعيلٌ إلزاميٌّ عند أول تسجيل)، وبريدٍ
+اختياريٍّ للاسترداد، وتحقّقٍ بخطوتين اختياريٍّ عبر SMS، ملتزمٌ بالحد الأدنى
+من البيانات (PDPL)، ومهيّأٌ لخط أنابيب الاسترجاع الهجين.
 
 ## 2. المبادئ الحاكمة للمخطّط
 - **نطاقان منفصلان:** (أ) بيانات التطبيق ينشئها المستخدم، (ب) قاعدة المعرفة
   القانونية. الأولى نصمّمها كاملةً، والثانية نُحاذي ما هو موجودٌ لديك.
 - **الحد الأدنى من البيانات:** لا هوية وطنية؛ فقط ما يلزم للخدمة والمصادقة.
+  الهاتف إلزاميٌّ (الهوية الأساسية)، والبريد اختياريٌّ (استرداد + قناة بديلة).
 - **العزل الافتراضي:** RLS صارمٌ يمنع تسرّب بياناتٍ بين المستخدمين.
-- **الحذف حقٌّ أصيل:** `ON DELETE CASCADE` يجعل حذف الحساب يمحو كل أثره.
-- **بيانات الاعتماد مصونة:** كلمة المرور مجزّأة (Argon2id)، الهاتف مشفّرٌ
-  (AES-256-GCM) مع بصمة HMAC للبحث، ورموز OTP/التجديد مجزّأة (انظر SEC-CRYPTO-001).
+- **الحذف حقٌّ أصيل:** `ON DELETE CASCADE` يجعل حذف الحساب يمحو كل أثره —
+  بما فيه سجلّات الموافقة (البرهان يلزم ما دامت المعالجة قائمة فقط).
+- **بيانات الاعتماد مصونة:** كلمة المرور مجزّأة (Argon2id)، الهاتف/البريد
+  مشفّران (AES-256-GCM) مع بصمة HMAC للبحث، ورموز OTP/التجديد مجزّأة
+  (انظر SEC-CRYPTO-001).
+- **المصادقة بلا اعتمادٍ على SMS كأساس:** الأساس هاتف+كلمة مرور؛ الـ OTP عبر
+  SMS (مزوّد محلي مثل الأوائل) إلزاميٌّ **مرّةً** عند أول تسجيل (تفعيل الحساب)،
+  ويُستخدم أيضاً في إعادة التعيين والتحقّق بخطوتين الاختياري. البصمة/الـ PIN
+  وسيلة دخولٍ إضافية **محلية على الجهاز** لا تُخزَّن في القاعدة.
 - **استراتيجية لغة التضمين:** يُخزَّن النص العربي للعرض، والإنجليزي للتضمين
   والبحث اللفظي الإنجليزي، مع بحثٍ لفظيٍّ عربيٍّ مساعد.
 
@@ -43,7 +51,11 @@ related:
 ```text
 users 1---* conversations 1---* messages 1---* message_sources
                                     *---1 feedback (per message)
-users 1---* otp_codes        (phone verification / password reset)
+                                    1---* attachments (per message; user-owned)
+users 1---* memories
+users 1---1 user_preferences
+users 1---* user_consents *---1 policy_versions
+users 1---* otp_codes        (phone/email verify | reset | 2FA login)
 users 1---* auth_sessions    (refresh tokens, revocable)
 legal_documents 1---* legal_articles 1---* legal_chunks
                           ^
@@ -58,34 +70,49 @@ message_sources *---1 legal_articles   (citation link, when available)
 --   CREATE EXTENSION IF NOT EXISTS vector;     -- pgvector
 --   CREATE EXTENSION IF NOT EXISTS pg_trgm;    -- trigram (Arabic lexical)
 CREATE TABLE users (
-  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  full_name      TEXT,
-  phone_enc      TEXT,          -- AES-256-GCM reversible (display) via CryptoService
-  phone_hash     TEXT UNIQUE,   -- HMAC-SHA-256 deterministic lookup (login/uniqueness), no plaintext
-  phone_verified BOOLEAN NOT NULL DEFAULT FALSE,
-  password_hash  TEXT,          -- Argon2id (SEC-CRYPTO-001); never plaintext
-  user_type      TEXT NOT NULL DEFAULT 'citizen',  -- citizen|lawyer|judge|researcher|bank
-  profession     TEXT,
-  governorate    TEXT,
-  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  full_name           TEXT,
+  username            TEXT UNIQUE,   -- معرّف عرضٍ اختياري (شاشة تعديل الملف)
+  phone_enc           TEXT,          -- AES-256-GCM reversible (display) via CryptoService
+  phone_hash          TEXT UNIQUE,   -- HMAC-SHA-256 deterministic lookup (login/uniqueness)
+  phone_verified      BOOLEAN NOT NULL DEFAULT FALSE,
+  email_enc           TEXT,          -- اختياري؛ AES-256-GCM (عرض)
+  email_hash          TEXT UNIQUE,   -- اختياري؛ HMAC للبحث/الفرادة (UNIQUE يسمح بتعدّد NULL)
+  email_verified      BOOLEAN NOT NULL DEFAULT FALSE,
+  password_hash       TEXT,          -- Argon2id (SEC-CRYPTO-001); never plaintext
+  avatar_key          TEXT,          -- مفتاح كائن صورة الملف في MinIO (تخزين On-Prem)
+  recovery_email_enc  TEXT,          -- بريد استرداد اختياري (مشفّر)
+  recovery_email_hash TEXT,          -- بصمة بريد الاسترداد (بحث)
+  mfa_enabled         BOOLEAN NOT NULL DEFAULT FALSE,  -- تحقّق بخطوتين عبر SMS (اختياري لكل مستخدم)
+  user_type           TEXT NOT NULL DEFAULT 'citizen', -- citizen|lawyer|judge|researcher|bank
+  profession          TEXT,
+  governorate         TEXT,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE TABLE otp_codes (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  phone_hash  TEXT NOT NULL,   -- deterministic lookup (no plaintext phone)
+  phone_hash  TEXT,            -- للقناة SMS (قد يكون NULL عند قناة البريد)
+  email_hash  TEXT,            -- للقناة email (قد يكون NULL عند SMS)
   user_id     UUID REFERENCES users(id) ON DELETE CASCADE,  -- NULL before the account exists
   code_hash   TEXT NOT NULL,   -- OTP stored hashed, never plaintext
-  purpose     TEXT NOT NULL CHECK (purpose IN ('verify_phone','reset_password')),
+  purpose     TEXT NOT NULL
+              CHECK (purpose IN ('verify_phone','verify_email','reset_password','mfa_login')),
+  channel     TEXT NOT NULL DEFAULT 'sms' CHECK (channel IN ('sms','email')),
   attempts    INT NOT NULL DEFAULT 0,
   expires_at  TIMESTAMPTZ NOT NULL,
   consumed_at TIMESTAMPTZ,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_otp_phone_purpose ON otp_codes(phone_hash, purpose);
+CREATE INDEX idx_otp_email_purpose ON otp_codes(email_hash, purpose);
 CREATE TABLE auth_sessions (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id            UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   refresh_token_hash TEXT NOT NULL,   -- SHA-256 of the opaque refresh token
   user_agent         TEXT,
+  device_label       TEXT,            -- اسمٌ ودّي للجهاز (شاشة الجلسات النشطة)
+  ip                 TEXT,            -- آخر عنوان معروف (شاشة الجلسات)
+  last_seen_at       TIMESTAMPTZ,     -- آخر نشاطٍ للجلسة
   created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
   expires_at         TIMESTAMPTZ NOT NULL,
   revoked_at         TIMESTAMPTZ
@@ -95,15 +122,20 @@ CREATE TABLE conversations (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   title       TEXT,
+  pinned      BOOLEAN NOT NULL DEFAULT FALSE,  -- تثبيت المحادثة أعلى القائمة
+  archived_at TIMESTAMPTZ,                     -- NULL = غير مؤرشفة
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_conversations_user ON conversations(user_id);
+CREATE INDEX idx_conversations_user        ON conversations(user_id);
+CREATE INDEX idx_conversations_user_pinned ON conversations(user_id, pinned);
 CREATE TABLE messages (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   conversation_id  UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
   role             TEXT NOT NULL CHECK (role IN ('user','assistant')),
   content          TEXT NOT NULL,
+  status           TEXT NOT NULL DEFAULT 'complete'
+                   CHECK (status IN ('pending','streaming','complete','error','stopped')),
   is_grounded      BOOLEAN,   -- NULL for user msgs; TRUE=sourced, FALSE=model-belief
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -122,23 +154,87 @@ CREATE TABLE message_sources (
 );
 CREATE INDEX idx_message_sources_message ON message_sources(message_id);
 CREATE TABLE feedback (
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  message_id            UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+  rating                TEXT NOT NULL CHECK (rating IN ('up','down')),
+  issue_category        TEXT,       -- فئة المشكلة عند 'down' (دقة|مصادر|تنسيق|سلامة|...)
+  safety_subcategory    TEXT,       -- تفصيلٌ عند اختيار فئة السلامة
+  conversation_included BOOLEAN NOT NULL DEFAULT FALSE,  -- هل أرفق المستخدم المحادثة
+  comment               TEXT,
+  model_version         TEXT,       -- لحلقة التقييم (regression labels)
+  retrieval_path        TEXT,       -- تشخيص مسار الاسترجاع (RAG)
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE attachments (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  message_id  UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
-  rating      TEXT NOT NULL CHECK (rating IN ('up','down')),
-  comment     TEXT,
+  message_id  UUID REFERENCES messages(id) ON DELETE CASCADE,  -- NULL أثناء التحضير قبل الإرسال
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,  -- مالك المرفق (للعزل RLS)
+  file_name   TEXT NOT NULL,
+  mime_type   TEXT NOT NULL,   -- يُتحقّق منه خادمياً (MIME + الحجم)
+  size_bytes  BIGINT NOT NULL,
+  storage_key TEXT NOT NULL,   -- مفتاح الكائن في MinIO (الملف نفسه خارج القاعدة)
+  status      TEXT NOT NULL DEFAULT 'preparing'
+              CHECK (status IN ('preparing','ready','error')),
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE INDEX idx_attachments_message ON attachments(message_id);
+CREATE INDEX idx_attachments_user    ON attachments(user_id);
+CREATE TABLE memories (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  content           TEXT NOT NULL,   -- سرّي (تشفير على مستوى التطبيق كالرسائل)
+  source            TEXT NOT NULL DEFAULT 'auto' CHECK (source IN ('auto','manual')),
+  source_message_id UUID REFERENCES messages(id) ON DELETE SET NULL,
+  is_active         BOOLEAN NOT NULL DEFAULT TRUE,   -- تحكّم المستخدم (إيقاف/تفعيل)
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_memories_user ON memories(user_id);
+CREATE TABLE user_preferences (
+  user_id         UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  theme           TEXT NOT NULL DEFAULT 'system',   -- system|light|dark
+  language        TEXT NOT NULL DEFAULT 'ar',
+  memory_enabled  BOOLEAN NOT NULL DEFAULT TRUE,     -- الذاكرة مفعّلة افتراضياً (مع إمكان الإيقاف)
+  advisor_role    TEXT,                              -- «تخصيص المستشار»
+  improve_service BOOLEAN NOT NULL DEFAULT FALSE,    -- «المساهمة في تحسين الخدمة» (OFF افتراضياً)
+  settings        JSONB NOT NULL DEFAULT '{}',       -- توسّعٌ مستقبليٌّ آمن
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE policy_versions (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  policy_type  TEXT NOT NULL CHECK (policy_type IN ('terms','privacy','disclaimer')),
+  version      TEXT NOT NULL,        -- e.g. 'v1.0-2026-07'
+  content      TEXT,                 -- النص أو مرجعٌ للوثيقة
+  published_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  is_current   BOOLEAN NOT NULL DEFAULT TRUE,
+  UNIQUE (policy_type, version)
+);
+CREATE TABLE user_consents (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  policy_version_id UUID NOT NULL REFERENCES policy_versions(id),
+  accepted_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  method            TEXT,           -- signup|reconsent
+  ip                TEXT,
+  user_agent        TEXT
+);
+CREATE INDEX idx_user_consents_user ON user_consents(user_id);
 ```
 
 | الجدول | الغرض | ملاحظة |
 | --- | --- | --- |
-| `users` | بيانات المستخدم + بيانات الاعتماد | `password_hash` بـ Argon2id؛ `phone_enc` مشفّر و`phone_hash` بصمة بحث؛ لا هوية وطنية |
-| `otp_codes` | رموز التحقق/إعادة التعيين | مجزّأة، قصيرة العمر، بحدّ محاولات؛ حذفٌ متتالٍ |
-| `auth_sessions` | جلسات رمز التجديد | `refresh_token_hash` قابلٌ للإبطال؛ حذفٌ متتالٍ |
-| `conversations` | الجلسات المحفوظة | حذفٌ متتالٍ عند حذف المستخدم |
-| `messages` | رسائل المحادثة + علم الإسناد | `is_grounded` سجلّ الإجابات غير المسنَدة |
+| `users` | بيانات المستخدم + بيانات الاعتماد | `password_hash` بـ Argon2id؛ الهاتف/البريد مشفّران وبصمة بحث؛ الهاتف إلزامي والبريد اختياري؛ `avatar_key` في MinIO؛ لا هوية وطنية |
+| `otp_codes` | التحقّق/إعادة التعيين/2FA | مجزّأة، قصيرة العمر، بحدّ محاولات؛ `purpose`+`channel`؛ حذفٌ متتالٍ |
+| `auth_sessions` | جلسات رمز التجديد | `refresh_token_hash` قابلٌ للإبطال؛ `device_label`/`ip`/`last_seen_at` لشاشة الجلسات |
+| `conversations` | الجلسات المحفوظة | `pinned`/`archived_at` للتثبيت والأرشفة؛ حذفٌ متتالٍ |
+| `messages` | رسائل المحادثة + الحالة + الإسناد | `status` لمنطق البثّ/التوقّف؛ `is_grounded` للإجابات غير المسنَدة |
 | `message_sources` | خانة «المصادر» تحت كل رسالة | `variant` و`article_id` يربطان بقاعدة المعرفة |
-| `feedback` | تغذية المجموعة الذهبية | مرتبطٌ بالرسالة لا بالمستخدم (تقليل الربط) |
+| `feedback` | تغذية المجموعة الذهبية | فئة/سلامة/إرفاق المحادثة + `model_version`/`retrieval_path` لحلقة التقييم |
+| `attachments` | مرفقات الرسائل (PDF/صور) | الملف في MinIO؛ القاعدة تحفظ المرجع + فحص MIME/الحجم؛ `status` للتحضير |
+| `memories` | ذاكرة المستخدم | تحكّمٌ كامل (عرض/إيقاف/حذف)؛ سرّية؛ حذفٌ متتالٍ |
+| `user_preferences` | تفضيلات المستخدم | سمة/لغة/ذاكرة/تخصيص المستشار/تحسين الخدمة؛ صفٌّ واحدٌ لكل مستخدم |
+| `policy_versions` | إصدارات السياسات | `is_current` تحدّد النسخة السارية |
+| `user_consents` | سجلّ موافقات المستخدم | برهانٌ مؤرّخٌ بالإصدار؛ حذفٌ متتالٍ عند حذف الحساب |
 
 ## 5. نطاق (ب): قاعدة المعرفة القانونية
 ```sql
@@ -202,33 +298,57 @@ CREATE TABLE legal_chunks (
 
 ## 6. عزل الصفوف (Row-Level Security)
 ```sql
-ALTER TABLE conversations  ENABLE ROW LEVEL SECURITY;
-ALTER TABLE messages       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE conversations    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE messages         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE attachments      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE memories         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_preferences ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_consents    ENABLE ROW LEVEL SECURITY;
 CREATE POLICY conv_isolation ON conversations
   USING (user_id = current_setting('app.current_user_id')::uuid);
 CREATE POLICY msg_isolation ON messages
   USING (conversation_id IN (
     SELECT id FROM conversations
     WHERE user_id = current_setting('app.current_user_id')::uuid));
+CREATE POLICY attachments_isolation ON attachments
+  USING (user_id = current_setting('app.current_user_id')::uuid);
+CREATE POLICY memories_isolation ON memories
+  USING (user_id = current_setting('app.current_user_id')::uuid);
+CREATE POLICY prefs_isolation ON user_preferences
+  USING (user_id = current_setting('app.current_user_id')::uuid);
+CREATE POLICY consents_isolation ON user_consents
+  USING (user_id = current_setting('app.current_user_id')::uuid);
 ```
 يستخرج الـ backend `user_id` من رمز الوصول (Bearer JWT) ويضبط المتغيّر
 `app.current_user_id` لكل طلب، فلا يصل أيّ مستخدمٍ إلا لصفوفه. جداول المصادقة
-(`otp_codes`, `auth_sessions`) يُتعامل معها في طبقة الخدمة بمفتاح الخدمة
-(service role) خارج مسار RLS للمستخدم.
+(`otp_codes`, `auth_sessions`) وجداول السياسات (`policy_versions`) يُتعامل معها
+في طبقة الخدمة بمفتاح الخدمة (service role) خارج مسار RLS للمستخدم.
 
 ## 7. التشفير وحماية الحقول
 - `users.password_hash`: مجزّأ بـ **Argon2id** (SEC-CRYPTO-001) — لا يُخزَّن ولا يُسجَّل نصّاً صريحاً.
-- `users.phone_enc`: يمرّ عبر `CryptoService` (AES-256-GCM قابل للفكّ؛ مبدئياً `NullCipher`).
-  العمود `TEXT` بحجمٍ يكفي النصّ المشفّر، فلا يلزم تعديل المخطّط عند تفعيل التشفير لاحقاً.
-- `users.phone_hash`: بصمة **HMAC-SHA-256** حتمية بمفتاحٍ سرّي — للبحث والفرادة دون كشف الرقم.
+- `users.phone_enc` / `users.email_enc` / `users.recovery_email_enc`: تمرّ عبر `CryptoService`
+  (AES-256-GCM قابل للفكّ؛ مبدئياً `NullCipher`). الأعمدة `TEXT` بحجمٍ يكفي النصّ المشفّر،
+  فلا يلزم تعديل المخطّط عند تفعيل التشفير لاحقاً.
+- `users.phone_hash` / `users.email_hash` / `users.recovery_email_hash`: بصمة **HMAC-SHA-256**
+  حتمية بمفتاحٍ سرّي (فهرسة عمياء) — للبحث والفرادة دون كشف القيمة الأصلية.
+- `messages.content` و`memories.content`: مصنّفان سرّيّين؛ يُفعَّل تشفيرهما على مستوى التطبيق
+  عبر `CryptoService` لاحقاً (لا يؤثّر على RAG لأنه يعمل على القوانين لا على رسائل المستخدم).
 - `otp_codes.code_hash`: رمز OTP مجزّأ، قصير العمر، بحدّ محاولاتٍ ومهلة.
 - `auth_sessions.refresh_token_hash`: بصمة **SHA-256** لرمز التجديد المبهم؛ يُبطَل عند الخروج/إعادة التعيين.
+- **البصمة/الـ PIN لقفل التطبيق:** يُخزَّنان **محلياً على الجهاز** في المخزن الآمن
+  (Keystore/Keychain) — لا عمود في القاعدة ولا إرسال للخادم.
+- **المرفقات:** ملفاتها في MinIO مع تشفيرٍ في الراحة وأثناء النقل وتحكّم وصول؛ القاعدة تحفظ المرجع فقط.
 - لا تُسجَّل بيانات شخصية أو أسرار في اللوقات.
 
 ## 8. الحذف والاحتفاظ (PDPL)
 - تُحفظ المحادثات حتى يحذفها المستخدم أو يُغلق حسابه.
-- حذف الحساب = حذف صفّ `users`؛ والـ CASCADE يمحو تلقائياً المحادثات
-  والرسائل والمصادر والتغذية الراجعة و`otp_codes` و`auth_sessions`.
+- حذف الحساب = حذف صفّ `users`؛ والـ CASCADE يمحو تلقائياً المحادثات والرسائل
+  والمصادر والتغذية الراجعة والمرفقات والذاكرة والتفضيلات وسجلّات الموافقة
+  و`otp_codes` و`auth_sessions`.
+- **الموافقات:** نحتفظ بالبرهان المُعرَّف ما دام الحساب قائماً (وقت الحاجة الفعلية)؛
+  وعند الحذف تُمحى مع الحساب لأن المعالجة توقّفت. (إن أوجب قانونٌ يمنيٌّ مستقبلاً
+  الاحتفاظ بالسجلّ لمدةٍ محدّدة، يُعاد النظر في هذا القرار.)
+- ملفات المرفقات في MinIO تُحذف بمهمةٍ متزامنةٍ مع حذف صفوف `attachments`.
 - رموز OTP المنتهية/المستهلكة تُنظَّف دورياً (مهمة مجدولة).
 - لا نستخدم الحذف الناعم للبيانات الشخصية كي لا نخالف مبدأ الحذف الفعلي.
 
@@ -237,12 +357,18 @@ CREATE POLICY msg_isolation ON messages
 | --- | --- |
 | `users.password_hash` | سرّي |
 | `users.phone_enc` / `users.phone_hash` | سرّي |
-| `users.full_name` | سرّي |
-| `users` (نوع/مهنة/محافظة) | داخلي |
+| `users.email_enc` / `users.email_hash` | سرّي |
+| `users.recovery_email_enc` / `users.recovery_email_hash` | سرّي |
+| `users.full_name` / `users.username` / `users.avatar_key` | سرّي |
+| `users` (نوع/مهنة/محافظة/mfa_enabled) | داخلي |
 | `otp_codes` | سرّي |
 | `auth_sessions` | سرّي |
 | `conversations.title` | سرّي |
 | `messages.content` | سرّي |
+| `attachments` (الملفات والبيانات الوصفية) | سرّي |
+| `memories.content` | سرّي |
+| `user_preferences` | داخلي |
+| `user_consents` / `policy_versions` | داخلي |
 | `message_sources` (نصوص قانونية) | عام (الربط داخلي) |
 | `feedback` | داخلي |
 | `legal_*` (النصوص القانونية) | عام |
@@ -251,10 +377,12 @@ CREATE POLICY msg_isolation ON messages
 | # | البند | الحالة |
 | --- | --- | --- |
 | 1 | بُعد `vector(n)` | مثبّت مبدئياً 1024؛ يُحسم مع نموذج التضمين |
-| 2 | جدول `otp_codes` و`auth_sessions` | **مُضافان** (v0.3) مع اعتماد المصادقة |
-| 3 | فهرس HNSW مقابل IVFFlat | يُحسم بعد قياس حجم القاعدة والأداء |
-| 4 | تطبيع `categories` إلى جدول taxonomy | مؤجّل؛ TEXT[] يكفي الآن |
-| 5 | إعداد بحثٍ عربيٍّ متخصّص (إضافة) | يُعاد النظر إن ضعُف الاستدعاء العربي |
+| 2 | فهرس HNSW مقابل IVFFlat | يُحسم بعد قياس حجم القاعدة والأداء |
+| 3 | تطبيع `categories` إلى جدول taxonomy | مؤجّل؛ TEXT[] يكفي الآن |
+| 4 | إعداد بحثٍ عربيٍّ متخصّص (إضافة) | يُعاد النظر إن ضعُف الاستدعاء العربي |
+| 5 | تضمين الذاكرة (`memories.embedding`) للاسترجاع الذكي | مؤجّل لمرحلةٍ لاحقة |
+| 6 | مصادقة TOTP (تطبيق مصادقة) كطبقةٍ إضافية | مؤجّلة؛ 2FA الحالي عبر SMS |
+| 7 | تفعيل التشفير الفعلي (استبدال NullCipher) للحقول السرّية | يُفعَّل قبل الإنتاج مع خزنة المفاتيح |
 
 ## 11. سجل التغييرات
 | الإصدار | التاريخ | الوصف | المعتمِد |
@@ -262,3 +390,4 @@ CREATE POLICY msg_isolation ON messages
 | 0.1 | 2026-06-24 | المسودّة الأولى لنموذج البيانات (تطبيق + معرفة) | — (Draft) |
 | 0.2 | 2026-06-24 | إضافة فهارس البحث اللفظي (tsvector + pg_trgm) وعمود `categories`؛ ربط ARC-RAG-001 | — (Draft) |
 | 0.3 | 2026-07-02 | اعتماد المصادقة: أعمدة `full_name`/`phone_hash`/`phone_verified`/`password_hash` في `users`، وجدولا `otp_codes` و`auth_sessions`؛ تحديث التشفير والحذف والتصنيف؛ ربط ARC-API-001 وSEC-CRYPTO-001 | — (Draft) |
+| 0.4 | 2026-07-04 | توسعةٌ شاملة موائمةٌ للواجهات: بريدٌ اختياري (enc/hash/verified) و`username`/`avatar_key`/بريد استرداد/`mfa_enabled` في `users`؛ `otp_codes` بأغراضٍ جديدة (`verify_email`/`mfa_login`) و`channel`/`email_hash`؛ إثراء `auth_sessions` (`device_label`/`ip`/`last_seen_at`)؛ `pinned`/`archived_at` في `conversations`؛ `status` في `messages`؛ إثراء `feedback`؛ جداول جديدة: `attachments`/`memories`/`user_preferences`/`policy_versions`/`user_consents`؛ توسعة RLS والتشفير والحذف والتصنيف؛ 2FA عبر SMS وقفلٌ محليٌّ بالبصمة/PIN؛ تأجيل TOTP وتضمين الذاكرة | — (Draft) |
