@@ -1,0 +1,89 @@
+name: بناء وثائق PDF الرسمية
+
+# يولّد PDF عربياً أنيقاً من ملفات Markdown.
+# - Run workflow يدوياً: اكتبي مسار ملف واحد في خانة "file" لتحويله وحده،
+#   أو اتركيها فارغة لتحويل كل الملفات.
+# - دفع إلى main: يحوّل الكل ويرفعه كـ Artifact.
+# - دفع وسم مثل v1.0: يُنشئ Release رسمياً بملفات الـ PDF.
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      file:
+        description: "مسار ملف واحد لتحويله (اتركيه فارغاً لتحويل كل الملفات)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  build-pdf:
+    runs-on: ubuntu-latest
+    steps:
+      - name: سحب المستودع
+        uses: actions/checkout@v4
+
+      - name: تثبيت Pandoc و XeLaTeX والخطوط العربية
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pandoc \
+            texlive-xetex \
+            texlive-lang-arabic \
+            texlive-latex-recommended \
+            fonts-hosny-amiri
+
+      - name: توليد ملفات PDF
+        env:
+          TARGET_FILE: $ github.event.inputs.file 
+        run: |
+          set -e
+          mkdir -p pdf-output
+
+          convert_one() {
+            file="$1"
+            base="$(printf '%s' "${file#./}" | sed -e 's/\.md$//' -e 's#[/ ]#_#g')"
+            out="pdf-output/${base}.pdf"
+            echo ":: تحويل $file -> $out"
+            pandoc "$file" \
+              --from=gfm+yaml_metadata_block \
+              --pdf-engine=xelatex \
+              --toc --toc-depth=2 \
+              -V lang=ar -V dir=rtl -V mainfont="Amiri" \
+              -V geometry:margin=2.5cm -V fontsize=12pt -V linkcolor=blue \
+              -o "$out" || echo "!! تعذّر تحويل $file (سيُتجاوز)"
+          }
+
+          if [ -n "$TARGET_FILE" ]; then
+            if [ -f "$TARGET_FILE" ]; then
+              convert_one "$TARGET_FILE"
+            else
+              echo "الملف غير موجود: $TARGET_FILE"; exit 1
+            fi
+          else
+            find . -type f -name '*.md' \
+              -not -path './pdf-output/*' \
+              -not -path './.github/*' -print0 |
+            while IFS= read -r -d '' f; do convert_one "$f"; done
+          fi
+
+          echo "== الملفات المولّدة =="
+          ls -la pdf-output
+
+      - name: رفع حزمة الـ PDF (Artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: almustashar-grc-pdf
+          path: pdf-output/*.pdf
+          if-no-files-found: error
+
+      - name: نشر إصدار رسمي عند وسم Git (Release)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: pdf-output/*.pdf
+          fail_on_unmatched_files: false
