@@ -1,7 +1,7 @@
 ---
 title: "عقد الواجهة البرمجية (REST + SSE) — المستشار القانوني الذكي"
 doc_id: ARC-API-001
-version: 0.3
+version: 0.3.1
 owner: مالك النظام / المدير التقني
 status: Draft
 approved_by: راعي المشروع
@@ -14,6 +14,7 @@ related:
   - ARC-DESIGN-001  # المعمارية
   - ARC-DATA-001    # نموذج البيانات (v0.4)
   - ARC-RAG-001     # خط أنابيب الاسترجاع (مصدر أحداث SSE)
+  - ARC-PROMPT-001  # التخصيص والذاكرة في المولّد
   - SEC-CRYPTO-001  # معيار التشفير (كلمة المرور، الهاتف، البريد، الرموز)
 ---
 
@@ -286,15 +287,22 @@ related:
 ### GET /v1/users/me/preferences
 ```json
 { "theme": "system", "language": "ar", "memory_enabled": true,
-  "advisor_role": null, "improve_service": false }
+  "advisor_role": null, "improve_service": false, "settings": {} }
 ```
 ### PATCH /v1/users/me/preferences
 ```json
 // request — كل الحقول اختيارية
 { "theme": "dark", "language": "ar", "memory_enabled": false,
-  "advisor_role": "صياغة موجزة ومباشرة", "improve_service": true }
+  "advisor_role": "صياغة موجزة ومباشرة", "improve_service": true,
+  "settings": { "response_style": "concise", "user_role": "lawyer",
+                "nickname": "أبو محمد" } }
 // response 200 — يعيد الحالة الكاملة بعد التحديث
 ```
+> `advisor_role` نصّ لغةٍ طبيعية موجز يُحقن في برومبت المولّد (ARC-PROMPT-001 §9)
+> لضبط **الأسلوب فقط**. أمّا `settings` فهي خريطة JSON حرّة تحفظ حقول التخصيص
+> الخام للواجهة (response_style / user_role / nickname ...) وتُشتقّ منها صياغة
+> `advisor_role`؛ **يُمنع** حشر تلك الحقول داخل `advisor_role` بفواصل. الشخصنة
+> أسلوبٌ فقط ولا تتجاوز الإسناد أو الحياد.
 
 ## 9. الذاكرة
 ### GET /v1/memories
@@ -313,7 +321,7 @@ related:
 { "is_active": false }  // أو { "content": "..." } -> 200
 ```
 ### DELETE /v1/memories/{id} -> 204   ·   DELETE /v1/memories -> 204 (مسح الكل)
-> إن كانت `preferences.memory_enabled=false` لا تُحقن الذاكرة في التوليد (ARC-PROMPT-001).
+> إن كانت `preferences.memory_enabled=false` لا تُحقن الذاكرة في التوليد (ARC-PROMPT-001 §9).
 
 ## 10. المحادثات
 ### GET /v1/conversations?limit=20&before=<ISO>&archived=false
@@ -465,3 +473,4 @@ data: {"code":"internal_error","message":"..."}
 | 0.1 | 2026-06-24 | المسودّة الأولى لعقد REST + SSE (نموذج الضيف) |
 | 0.2 | 2026-07-02 | اعتماد المصادقة الكاملة (هاتف+كلمة مرور+OTP): مسارات `/v1/auth/*`، رموز Bearer، أخطاء 401/409/422/423، ربط SEC-CRYPTO-001 |
 | 0.3 | 2026-07-04 | مواءمةٌ مع ARC-DATA-001 v0.4: بريدٌ اختياري وتحقّقه، **2FA عبر SMS** (mfa_required + mfa_login)، شاشة الجلسات النشطة، رفع صورة الملف والمرفقات عبر MinIO presigned، التفضيلات، الذاكرة (CRUD)، تثبيت/أرشفة المحادثات، حالة الرسالة وإيقاف البثّ، إثراء التغذية الراجعة، السياسات والموافقة وإعادة القبول |
+| 0.3.1 | 2026-07-04 | إضافة حقل `settings` (JSONB حرّ) إلى التفضيلات لحفظ حقول تخصيص الواجهة الخام مع إبقاء `advisor_role` نصّاً طبيعياً؛ توضيح فصل الشخصنة عن الإسناد وإحالتها إلى ARC-PROMPT-001 §9 |

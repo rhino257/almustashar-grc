@@ -1,18 +1,19 @@
 ---
 title: "مواصفة خط أنابيب الاسترجاع والتوليد (RAG) — المستشار القانوني الذكي"
 doc_id: ARC-RAG-001
-version: 0.1
+version: 0.2
 owner: مالك النظام / المدير التقني
 status: Draft
 approved_by: راعي المشروع
-last_review: 2026-06-24
+last_review: 2026-07-04
 next_review: 2026-12-24
 frameworks:
   - { name: "ISO/IEC 42001", status: محاذاة }
   - { name: "OWASP Top 10 for LLMs", status: محاذاة }
 related:
   - ARC-DESIGN-001  # المعمارية
-  - ARC-DATA-001    # نموذج البيانات
+  - ARC-DATA-001    # نموذج البيانات (v0.4)
+  - ARC-API-001     # عقد الواجهة (أحداث SSE)
   - GOV-ADR-001     # القرارات التقنية
 ---
 
@@ -31,10 +32,11 @@ related:
 - **الحياد طبقة فحص:** لا تعليمة فقط، بل عقدة تحقّق مستقلة.
 
 ## 3. نظرة عامة (عقد LangGraph)
-​
+```text
 [intake] -> [analyze (Model-1)] -> [retrieve (hybrid)] -> [fuse (RRF)]
 -> [rerank (jina-v3)] -> [select_context] -> [generate (Model-2)]
 -> [grounding_check] -> [neutrality_check] -> [stream_out]
+```
 
 | العقدة | مؤشّر الحالة (SSE) للمستخدم |
 | --- | --- |
@@ -43,20 +45,24 @@ related:
 | rerank + select | "جارٍ ترتيب أهم المصادر..." |
 | generate (stream) | بثّ حيّ للإجابة |
 
+> أسماء العقد (`analyze`, `retrieve`, `rerank`, `generate`) مطابقةٌ لِما يُرسَل
+> في حدث SSE `status.node` (ARC-API-001 §12)، فالمؤشّرات تعكس التنفيذ الحقيقي.
+
 ## 4. المرحلة 1: النموذج المحلّل (Analyzer / Model-1)
 **القرار:** نفس Gemma 4 31B بإخراجٍ مقيّد للـ MVP، مجرَّداً كمكوّن
 `Analyzer` قابل للاستبدال. محفّز الترقية: إن صار على المسار الحرج للكمون،
 نستبدله بنموذجٍ صغير مخصّص (Gemma 4 4B Q4) دون تغيير بقية الأنابيب.
 
 عقد المخرجات (JSON صارم، `max_tokens` ~256):
-​
+```json
 {
-"rewritten_query_en": "standalone English reformulation with context",
-"hypothetical_answer_en": "SHORT hypothetical legal answer (<=200 tokens)",
-"keywords_en": ["term1", "term2"],
-"keywords_ar": ["مصطلح1", "مصطلح2"],
-"categories": ["family_law", "commercial_law"]
+  "rewritten_query_en": "standalone English reformulation with context",
+  "hypothetical_answer_en": "SHORT hypothetical legal answer (<=200 tokens)",
+  "keywords_en": ["term1", "term2"],
+  "keywords_ar": ["مصطلح1", "مصطلح2"],
+  "categories": ["family_law", "commercial_law"]
 }
+```
 
 | الحقل | الاستخدام في الأنابيب |
 | --- | --- |
@@ -71,15 +77,17 @@ related:
 
 ## 5. المرحلة 2: الاسترجاع الهجين + الدمج (RRF)
 أربع قوائم مرتّبة تدخل RRF:
-​
+```text
 L1 = dense_search( embed(hypothetical_answer_en) )  top=50
 L2 = dense_search( embed(rewritten_query_en) )      top=50
 L3 = lexical_search_en( keywords_en )               top=50   (BM25/full-text on content_en)
 L4 = lexical_search_ar( keywords_ar )               top=50   (full-text on content_ar)
 fused = RRF([L1, L2, L3, L4], k=60)   # keep top 100 for reranking
+```
 صيغة RRF:
-​
+```text
 score(d) = sum over lists L of  1 / (k + rank_L(d)),   k = 60
+```
 تُنفَّذ القوائم الأربع **بالتوازي** لتقليل الكمون.
 
 **قرار الفلترة بالتصنيف (MVP):** بلا فلتر. نلتقط `categories` ونؤجّل تطبيق
@@ -101,21 +109,30 @@ score(d) = sum over lists L of  1 / (k + rank_L(d)),   k = 60
   بالتساوي (تطبيقٌ مباشر لمبدأ الحياد على مستوى الاسترجاع).
 
 ## 8. المرحلة 5: التوليد وطبقات الفحص
-​
+```text
 generate (Model-2, Gemma 4 31B):
-input  : question_ar + top_articles_ar + system_prompt
-output : Arabic answer, STREAMED via SSE
+  input  : question_ar + top_articles_ar + system_prompt
+  output : Arabic answer, STREAMED via SSE
 grounding_check:
-set messages.is_grounded = TRUE if answer is supported by retrieved sources
-else FALSE  -> UI shows red "غير مسنَد" label, event is logged
+  set messages.is_grounded = TRUE if answer is supported by retrieved sources
+  else FALSE  -> UI shows red "غير مسنَد" label, event is logged
 neutrality_check:
-independent verification layer (two-government neutrality);
-block/flag politically non-neutral phrasing before final emit
+  independent verification layer (two-government neutrality);
+  block/flag politically non-neutral phrasing before final emit
+```
+
+**ربط حالة الرسالة:** أثناء التوليد تكون `messages.status='streaming'`، وعند
+الاكتمال `complete`، أو `stopped` عند إيقاف المستخدم (`/v1/messages/{id}/stop`)،
+أو `error` عند فشل البثّ — وتُرسَل الحالة النهائية في حدث `done.status` (ARC-API-001 §12).
+
+**التخصيص:** يحقن المولّد `user_preferences.advisor_role` والذكريات النشطة كتوجيه
+أسلوبٍ فقط، دون تجاوز الإسناد أو الحياد (ARC-PROMPT-001 §9).
 
 ## 9. البثّ ومؤشّرات الحالة (SSE)
 - كل عقدةٍ تُصدر حدث حالةٍ مرتبطاً باسمها الفعلي في LangGraph (لا نصوصاً
   وهمية)، فالواجهة تفاعليةٌ وتعكس الحالة الحقيقية.
-- التوليد يُبثّ توكناً بتوكن؛ خانة المصادر تُملأ من `message_sources`.
+- التوليد يُبثّ توكناً بتوكن عبر حدث `token.delta`؛ خانة المصادر تُملأ من
+  `message_sources`، ويُختم بحدث `done` حاملاً `is_grounded` و`status`.
 
 ## 10. ميزانية الكمون (هدف <= 15s)
 | المرحلة | تقدير |
@@ -131,10 +148,15 @@ block/flag politically non-neutral phrasing before final emit
 
 البثّ يجعل الكمون **المحسوس** = زمن أول توكن، لا زمن الإجابة الكاملة.
 
-## 11. متطلّبات يفرضها هذا الأنبوب على نموذج البيانات (ترتد إلى ARC-DATA-001 v0.2)
+## 11. متطلّبات يفرضها هذا الأنبوب على نموذج البيانات (ترتد إلى ARC-DATA-001 v0.4)
 - فهرس بحثٍ لفظي على `content_en` (مثل `tsvector` + GIN).
 - فهرس بحثٍ لفظي على `content_ar` (إعداد عربي/trigram).
 - عمود `categories` (تصنيف قانوني) على `legal_articles` — مهيّأ، غير مُستخدَم في الـ MVP.
+- ربط `messages.status` بعقدة التوليد (streaming ثم complete/stopped/error).
+- `feedback.retrieval_path` و`feedback.model_version` يسجّلهما الخادم من هذا
+  الأنبوب (مسار الاسترجاع المستخدَم وإصدار النموذج) لحلقة التقييم — لا يرسلهما العميل.
+- **المرفقات (attachments) خارج نطاق استرجاع الـ MVP:** الاسترجاع على قاعدة
+  المعرفة القانونية فقط، ولا يُستخرج نصّ المرفقات لإدماجه في السياق (ARC-API-001 §17 #6).
 
 ## 12. القرارات المفتوحة
 | # | البند | الحالة |
@@ -148,4 +170,4 @@ block/flag politically non-neutral phrasing before final emit
 | الإصدار | التاريخ | الوصف |
 | --- | --- | --- |
 | 0.1 | 2026-06-24 | المسودّة الأولى لخط أنابيب RAG (HyDE + Hybrid RRF + rerank + معماريّة نموذجين) |
-​
+| 0.2 | 2026-07-04 | مواءمة مع ARC-DATA-001 v0.4 / ARC-API-001 v0.3: ربط حالة الرسالة بعقدة التوليد، تسجيل retrieval_path/model_version في التغذية الراجعة، استبعاد المرفقات من استرجاع الـ MVP، مواءمة مؤشّرات SSE مع أسماء العقد (status.node/token.delta/done.status)، وإحالة حقن التخصيص إلى ARC-PROMPT-001 |
