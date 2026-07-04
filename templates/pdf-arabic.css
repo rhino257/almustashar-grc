@@ -94,10 +94,20 @@ h3 {
 
 /* ===== الفقرات والمواد ===== */
 p { margin: 0.28cm 0; }
-p strong:first-child { color: #0b3d2e; }
-/* فصل العنوان الغامق عن النص لمنع تداخل الكلمات في تصيير RTL بمحرك WeasyPrint */
-p strong:first-child::after { content: "\00A0"; }
-li strong:first-child::after { content: "\00A0"; }
+/* عنوان المادة الغامق يُعرض في سطرٍ مستقلٍّ فوق نصّه — الحل المضمون لمنع تداخل الكلمات في تصيير RTL بمحرك WeasyPrint */
+p strong:first-child {
+  display: block;
+  color: #0b3d2e;
+  margin-bottom: 0.1cm;
+}
+li strong:first-child {
+  display: block;
+  color: #0b3d2e;
+  margin-bottom: 0.06cm;
+}
+/* استثناء الاقتباس (الديباجة) ليبقى عنوانه ضمن السطر */
+blockquote p strong:first-child { display: inline; margin-bottom: 0; }
+blockquote p strong:first-child::after { content: "\00A0"; }
 
 /* ===== الاقتباس (الديباجة) ===== */
 blockquote {
