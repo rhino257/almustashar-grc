@@ -75,22 +75,30 @@ nav#TOC li { margin: 3pt 0; }
 nav#TOC a { text-decoration: none; color: #1c1c1c; }
 nav#TOC ul ul { padding-right: 1cm; font-size: 11pt; color: #444; }
 
-/* ===== العناوين ===== */
+/* ===== العناوين — تدفّق متّصل بلا صفحات مُهدَرة ===== */
 h1, h2, h3 { font-family: "Amiri", serif; }
-h2 {
-  page-break-before: always;
+h1 {
+  font-size: 21pt; color: #0b3d2e;
   page-break-after: avoid;
-  font-size: 17pt; color: #0b3d2e;
-  border-bottom: 2px solid #0b3d2e; padding-bottom: 5pt; margin: 0 0 0.5cm;
+  margin: 0 0 0.5cm;
 }
+h2 {
+  page-break-after: avoid;
+  page-break-inside: avoid;
+  font-size: 17pt; color: #0b3d2e;
+  border-bottom: 2px solid #0b3d2e; padding-bottom: 5pt;
+  margin: 0.9cm 0 0.45cm;
+}
+h2:first-child { margin-top: 0; }
 h3 {
   page-break-after: avoid;
-  font-size: 13pt; color: #10513c; margin: 0.5cm 0 0.2cm;
+  page-break-inside: avoid;
+  font-size: 13pt; color: #10513c; margin: 0.55cm 0 0.2cm;
 }
 
-/* ===== بطاقة الضبط والديباجة في صفحة مستقلة ===== */
-.docmeta { page-break-after: always; }
+/* ===== بطاقة الضبط ===== */
 .docmeta h2 { page-break-before: avoid; }
+.docmeta h2:first-child { margin-top: 0; }
 
 /* ===== الفقرات والمواد ===== */
 p { margin: 0.28cm 0; }
