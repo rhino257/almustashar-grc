@@ -105,9 +105,12 @@ li strong:first-child {
   color: #0b3d2e;
   margin-bottom: 0.06cm;
 }
-/* استثناء الاقتباس (الديباجة) ليبقى عنوانه ضمن السطر */
-blockquote p strong:first-child { display: inline; margin-bottom: 0; }
-blockquote p strong:first-child::after { content: "\00A0"; }
+/* الديباجة (داخل الاقتباس): عنوانها في سطر مستقل أيضاً لمنع التداخل */
+blockquote p strong:first-child {
+  display: block;
+  color: #0b3d2e;
+  margin-bottom: 0.08cm;
+}
 
 /* ===== الاقتباس (الديباجة) ===== */
 blockquote {
