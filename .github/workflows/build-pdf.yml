@@ -21,23 +21,17 @@ jobs:
       - name: سحب المستودع
         uses: actions/checkout@v4
 
-      - name: تثبيت Pandoc و XeLaTeX والخطوط العربية
+      - name: تثبيت Pandoc و WeasyPrint والخطوط العربية
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            pandoc \
-            texlive-xetex \
-            texlive-lang-arabic \
-            texlive-latex-recommended \
-            fonts-hosny-amiri
+          sudo apt-get install -y pandoc weasyprint fonts-hosny-amiri
 
       - name: توليد ملفات PDF
         run: |
           set -e
           mkdir -p pdf-output
-
-          # يقرأ الملف المطلوب من مُدخل التشغيل اليدوي (فارغ عند الدفع العادي)
           TARGET_FILE="$(jq -r '.inputs.file // ""' "$GITHUB_EVENT_PATH")"
+          CSS="$(pwd)/templates/pdf-arabic.css"
 
           convert_one() {
             file="$1"
@@ -45,11 +39,14 @@ jobs:
             out="pdf-output/${base}.pdf"
             echo ":: تحويل $file -> $out"
             pandoc "$file" \
+              --standalone \
               --from=gfm+yaml_metadata_block \
-              --pdf-engine=xelatex \
+              --to=pdf \
+              --pdf-engine=weasyprint \
+              --css="$CSS" \
+              --metadata lang=ar \
+              --metadata dir=rtl \
               --toc --toc-depth=2 \
-              -V lang=ar -V dir=rtl -V mainfont="Amiri" \
-              -V geometry:margin=2.5cm -V fontsize=12pt -V linkcolor=blue \
               -o "$out" || echo "!! تعذّر تحويل $file (سيُتجاوز)"
           }
 
