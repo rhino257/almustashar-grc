@@ -1,14 +1,22 @@
 ---
 title: سياسة أمن المعلومات (Information Security Policy)
+subtitle: السياسة الأمّ لنظام إدارة أمن المعلومات — مشروع المستشار القانوني الذكي
 doc_id: POL-POLICY-001
 version: 0.1
 status: Draft
 owner: مسؤول أمن المعلومات (CISO)
 approved_by: محمد عبدالرحمن أحمد الأبيض / أسامة عارف السقاف
+author:
+  - "المُعرّف: POL-POLICY-001"
+  - "الإصدار: 0.1  ·  التصنيف: داخلي"
+  - "المعتمِدون: محمد عبدالرحمن أحمد الأبيض / أسامة عارف السقاف"
+date: 2026-06-21
 last_review: 2026-06-21
 next_review: 2026-09-21
 classification: داخلي
 governing_law: القانون اليمني والشريعة الإسلامية
+lang: ar
+dir: rtl
 frameworks:
   - name: ISO/IEC 27001:2022
     status: مُطبّق
@@ -19,6 +27,9 @@ frameworks:
   - name: NCA ECC
     status: محاذاة
 ---
+
+<div class="rh-id">POL-POLICY-001</div>
+<div class="rh-class">داخلي</div>
 
 # سياسة أمن المعلومات
 

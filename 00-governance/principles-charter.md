@@ -19,6 +19,9 @@ lang: ar
 dir: rtl
 ---
 
+<div class="rh-id">GOV-PRINCIPLES-001</div>
+<div class="rh-class">داخلي</div>
+
 <div class="docmeta">
 
 ## بطاقة ضبط الوثيقة

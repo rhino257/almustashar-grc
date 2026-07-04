@@ -1,14 +1,22 @@
 ---
 title: بطاقة النموذج — Gemma 4 31B (المحرّك اللغوي للمستشار القانوني الذكي)
+subtitle: بطاقة النموذج — المحرّك اللغوي لمشروع المستشار القانوني الذكي
 doc_id: AIG-MODELCARD-001
 version: 0.1
 status: Draft
 owner: رئيس الحوكمة (GRC) ومسؤول حوكمة الذكاء الاصطناعي (AI Governance)
 approved_by: محمد عبدالرحمن أحمد الأبيض / أسامة عارف السقاف
+author:
+  - "المُعرّف: AIG-MODELCARD-001"
+  - "الإصدار: 0.1  ·  التصنيف: سرّي للغاية"
+  - "المعتمِدون: محمد عبدالرحمن أحمد الأبيض / أسامة عارف السقاف"
+date: 2026-06-21
 last_review: 2026-06-21
 next_review: 2026-09-21
 classification: سرّي للغاية
 governing_law: القانون اليمني والشريعة الإسلامية
+lang: ar
+dir: rtl
 frameworks:
   - name: ISO/IEC 42001:2023
     status: مُطبّق
@@ -21,6 +29,9 @@ frameworks:
   - name: PDPL (SDAIA)
     status: محاذاة
 ---
+
+<div class="rh-id">AIG-MODELCARD-001</div>
+<div class="rh-class ts">سرّي للغاية</div>
 
 # بطاقة النموذج — Gemma 4 31B
 

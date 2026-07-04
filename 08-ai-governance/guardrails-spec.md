@@ -1,14 +1,22 @@
 ---
 title: مواصفات ضوابط الأمان والحياد السياسي (Guardrails Specification)
+subtitle: مواصفات ضوابط الأمان والحياد السياسي — مشروع المستشار القانوني الذكي
 doc_id: AIG-GUARDRAILS-001
 version: 0.1
 status: Draft
 owner: مسؤول حوكمة الذكاء الاصطناعي (AI Governance) ومسؤول التطوير الآمن (SecDev)
 approved_by: محمد عبدالرحمن أحمد الأبيض / أسامة عارف السقاف
+author:
+  - "المُعرّف: AIG-GUARDRAILS-001"
+  - "الإصدار: 0.1  ·  التصنيف: سرّي للغاية"
+  - "المعتمِدون: محمد عبدالرحمن أحمد الأبيض / أسامة عارف السقاف"
+date: 2026-06-21
 last_review: 2026-06-21
 next_review: 2026-09-21
 classification: سرّي للغاية
 governing_law: القانون اليمني والشريعة الإسلامية
+lang: ar
+dir: rtl
 frameworks:
   - name: OWASP Top 10 for LLM Applications (2025)
     status: مُطبّق
@@ -19,6 +27,9 @@ frameworks:
   - name: PDPL (SDAIA)
     status: محاذاة
 ---
+
+<div class="rh-id">AIG-GUARDRAILS-001</div>
+<div class="rh-class ts">سرّي للغاية</div>
 
 # مواصفات ضوابط الأمان والحياد السياسي
 
