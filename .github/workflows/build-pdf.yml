@@ -1,11 +1,5 @@
 name: بناء وثائق PDF الرسمية
 
-# يولّد PDF عربياً أنيقاً من ملفات Markdown.
-# - Run workflow يدوياً: اكتبي مسار ملف واحد في خانة "file" لتحويله وحده،
-#   أو اتركيها فارغة لتحويل كل الملفات.
-# - دفع إلى main: يحوّل الكل ويرفعه كـ Artifact.
-# - دفع وسم مثل v1.0: يُنشئ Release رسمياً بملفات الـ PDF.
-
 on:
   push:
     branches: [ main ]
@@ -38,11 +32,12 @@ jobs:
             fonts-hosny-amiri
 
       - name: توليد ملفات PDF
-        env:
-          TARGET_FILE: $ github.event.inputs.file 
         run: |
           set -e
           mkdir -p pdf-output
+
+          # يقرأ الملف المطلوب من مُدخل التشغيل اليدوي (فارغ عند الدفع العادي)
+          TARGET_FILE="$(jq -r '.inputs.file // ""' "$GITHUB_EVENT_PATH")"
 
           convert_one() {
             file="$1"
