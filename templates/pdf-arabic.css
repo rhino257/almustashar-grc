@@ -217,6 +217,39 @@ blockquote p strong:first-child {
 }
 
 /* ==============================================================
+   الشيفرة المضمّنة (inline code)
+   عزل ثنائي الاتجاه لمنع تداخل النص الإنجليزي (LTR)
+   مع النص العربي (RTL) عند التفاف السطر
+   ============================================================== */
+code {
+  font-family: "DejaVu Sans Mono", "Amiri", monospace;
+  font-size: 0.92em;
+  direction: ltr;
+  unicode-bidi: isolate;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+pre {
+  direction: ltr;
+  text-align: left;
+  unicode-bidi: isolate;
+  background: #f5f4f5;
+  border: 1px solid #e2e0e2;
+  border-radius: 3px;
+  padding: 0.3cm 0.4cm;
+  margin: 0.5cm 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+pre code {
+  font-size: 0.9em;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+/* ==============================================================
    الديباجة (blockquote)
    ============================================================== */
 blockquote {
