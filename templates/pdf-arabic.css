@@ -1,28 +1,46 @@
-/* قالب موحّد للطباعة الاحترافية للعربية (محرّك WeasyPrint) — يصلح لكل وثائق المستودع */
-/* آخر تحديث: 2026-07-05 — إضافة شعار الغلاف + إصلاح تداخل الغامق المضمَّن */
+/* =============================================================
+   قالب وثائق مشروع المستشار القانوني الذكي
+   الهوية البصرية: #121212 (داكن) — #f5f4f5 (فاتح) — #121f38 (أزرق الشعار)
+   المحرّك: WeasyPrint — الخط: Amiri — آخر تحديث: 2026-07-05
+   ============================================================= */
 
+/* ==============================================================
+   أبعاد الصفحة وحواشيها
+   ============================================================== */
 @page {
   size: A4;
   margin: 2.4cm 2cm 2cm 2cm;
+
+  /* ترويسة: شعار (يمين) — مُعرّف الوثيقة (وسط) — التصنيف (يسار) */
   @top-right {
+    content: url("logo-header.svg");
+    vertical-align: middle;
+  }
+  @top-center {
     content: element(rhId);
+    vertical-align: middle;
   }
   @top-left {
     content: element(rhClass);
+    vertical-align: middle;
   }
   @bottom-center {
     content: "صفحة " counter(page) " من " counter(pages);
-    font-family: "Amiri", serif; font-size: 9pt; color: #66716c;
+    font-family: "Amiri", serif; font-size: 9pt; color: #888888;
   }
 }
 
 @page cover {
   margin: 0;
-  @top-right { content: none; }
-  @top-left { content: none; }
+  @top-right  { content: none; }
+  @top-center { content: none; }
+  @top-left   { content: none; }
   @bottom-center { content: none; }
 }
 
+/* ==============================================================
+   قاعدة الصفحة
+   ============================================================== */
 html { direction: rtl; }
 
 body {
@@ -33,137 +51,199 @@ body {
   text-align: justify;
 }
 
-/* ===== ترويسة الصفحة الديناميكية (تُقرأ من بيانات كل ملف) ===== */
+/* ==============================================================
+   حاقنَا الترويسة الديناميكية
+   ============================================================== */
 .rh-id, .rh-class {
   font-family: "Amiri", serif; font-size: 8pt; color: #9aa5a1;
 }
-.rh-id { position: running(rhId); }
+.rh-id   { position: running(rhId); }
 .rh-class { position: running(rhClass); }
 .rh-class.sec { color: #8a6d00; font-weight: 700; }
-.rh-class.ts { color: #b00020; font-weight: 700; }
+.rh-class.ts  { color: #b00020; font-weight: 700; }
 
-/* ===== صفحة الغلاف ===== */
+/* ==============================================================
+   صفحة الغلاف
+   تصميم: قسم داكن علوي (12cm) بشعار أبيض + قسم فاتح سفلي لبيانات الوثيقة
+   ============================================================== */
 #title-block-header {
   page: cover;
   page-break-after: always;
   text-align: center;
-  padding: 0 2.5cm;
-  border-top: 1.4cm solid #0b3d2e;
-  /* شعار المشروع — يظهر أعلى الغلاف بعد الشريط الأخضر مباشرةً */
-  background-image: url("logo.svg");
-  background-repeat: no-repeat;
-  background-position: center 1.6cm;
-  background-size: 5.5cm auto;
-}
-#title-block-header .title {
-  /* أُخِّر العنوان للأسفل لمنح مساحةٍ للشعار (كانت 9cm قبل الشعار) */
-  margin-top: 5.5cm; font-size: 32pt; font-weight: 700;
-  color: #0b3d2e; line-height: 1.4;
-}
-#title-block-header .subtitle {
-  margin-top: 0.8cm; font-size: 14pt; color: #4a4a4a; line-height: 1.7;
-}
-#title-block-header .author {
-  margin-top: 3cm; font-size: 12pt; color: #333; line-height: 2;
-}
-#title-block-header .date {
-  margin-top: 0.6cm; font-size: 11pt; color: #666;
+  padding: 0;
+  margin: 0;
 }
 
-/* ===== المحتويات ===== */
+/* القسم الداكن العلوي — خلفية #121212 + شعار أبيض مركّز */
+#title-block-header::before {
+  content: "";
+  display: block;
+  background-color: #121212;
+  height: 12cm;
+  background-image: url("logo-white.svg");
+  background-repeat: no-repeat;
+  background-position: center 3.5cm;
+  background-size: auto 5cm;
+}
+
+/* العنوان — أسود على فاتح */
+#title-block-header .title {
+  margin-top: 2cm;
+  font-size: 26pt;
+  font-weight: 700;
+  color: #121212;
+  line-height: 1.4;
+  padding: 0 2.5cm;
+}
+/* العنوان الفرعي */
+#title-block-header .subtitle {
+  margin-top: 0.7cm;
+  font-size: 13pt;
+  color: #555555;
+  line-height: 1.7;
+  padding: 0 2.5cm;
+}
+/* بيانات الوثيقة (doc_id · version · approved_by) */
+#title-block-header .author {
+  margin-top: 2.5cm;
+  font-size: 11pt;
+  color: #444444;
+  line-height: 2.1;
+  padding: 0.6cm 3cm 0;
+  border-top: 1px solid #dddddd;
+}
+/* التاريخ */
+#title-block-header .date {
+  margin-top: 0.5cm;
+  font-size: 10pt;
+  color: #888888;
+  padding-bottom: 1.5cm;
+}
+
+/* ==============================================================
+   فهرس المحتويات
+   ============================================================== */
 nav#TOC { page-break-after: always; }
 nav#TOC::before {
   content: "المحتويات";
-  display: block; font-size: 18pt; font-weight: 700; color: #0b3d2e;
-  border-bottom: 2px solid #0b3d2e; padding-bottom: 5pt; margin-bottom: 0.6cm;
+  display: block;
+  font-size: 18pt;
+  font-weight: 700;
+  color: #121212;
+  border-bottom: 2px solid #121212;
+  padding-bottom: 5pt;
+  margin-bottom: 0.6cm;
 }
 nav#TOC ul { list-style: none; padding-right: 0; margin: 0; }
 nav#TOC li { margin: 3pt 0; }
-nav#TOC a { text-decoration: none; color: #1c1c1c; }
-nav#TOC ul ul { padding-right: 1cm; font-size: 11pt; color: #444; }
+nav#TOC a  { text-decoration: none; color: #1c1c1c; }
+nav#TOC ul ul { padding-right: 1cm; font-size: 11pt; color: #555555; }
 
-/* ===== العناوين — تدفّق متّصل بلا صفحات مُهدَرة ===== */
+/* ==============================================================
+   العناوين — تدفّق متّصل بلا صفحات مُهدَرة
+   ============================================================== */
 h1, h2, h3 { font-family: "Amiri", serif; }
 h1 {
-  font-size: 21pt; color: #0b3d2e;
+  font-size: 21pt;
+  color: #121212;
   page-break-after: avoid;
   margin: 0 0 0.5cm;
 }
 h2 {
   page-break-after: avoid;
   page-break-inside: avoid;
-  font-size: 17pt; color: #0b3d2e;
-  border-bottom: 2px solid #0b3d2e; padding-bottom: 5pt;
+  font-size: 17pt;
+  color: #121212;
+  border-bottom: 2px solid #121212;
+  padding-bottom: 5pt;
   margin: 0.9cm 0 0.45cm;
 }
 h2:first-child { margin-top: 0; }
 h3 {
   page-break-after: avoid;
   page-break-inside: avoid;
-  font-size: 13pt; color: #10513c; margin: 0.55cm 0 0.2cm;
+  font-size: 13pt;
+  color: #333333;
+  margin: 0.55cm 0 0.2cm;
 }
 
-/* ===== بطاقة الضبط ===== */
+/* ==============================================================
+   بطاقة الضبط (.docmeta)
+   ============================================================== */
 .docmeta h2 { page-break-before: avoid; }
 .docmeta h2:first-child { margin-top: 0; }
 
-/* ===== الفقرات والمواد ===== */
+/* ==============================================================
+   الفقرات والمواد — إصلاح تداخل الغامق (طبقتان)
+   ============================================================== */
 p { margin: 0.28cm 0; }
 
-/*
-  إصلاح تداخل الغامق — طبقتان:
-  ١) قاعدة أسلوبية: يُقصر الغامق على عناوين المواد في بداية السطر فقط
-     (مُوثَّق في STYLE_GUIDE.md — القاعدة و).
-  ٢) شبكة أمان CSS: تباعدٌ جانبي خفيف على أي strong مضمَّن
-     لمنع التصاق الكلمات في تصيير WeasyPrint RTL.
-*/
-
-/* شبكة الأمان: تباعدٌ جانبي على الغامق المضمَّن في السطر */
-p strong,
-li strong,
-td strong,
-blockquote p strong {
+/* طبقة ١: شبكة أمان CSS — تباعدٌ جانبي يمنع التصاق كلمات في WeasyPrint RTL */
+p strong, li strong, td strong, blockquote p strong {
   padding-inline: 0.12em;
 }
 
-/* التسمية في بداية السطر (display:block) — بلا تباعد جانبي */
+/* طبقة ٢: عنوان المادة (أول كلمة غامقة) — سطر مستقل */
 p strong:first-child,
 li strong:first-child,
 blockquote p strong:first-child {
   display: block;
   padding-inline: 0;
-  color: #0b3d2e;
+  color: #121212;
   margin-bottom: 0.1cm;
 }
 
-/* ===== الاقتباس (الديباجة) ===== */
+/* ==============================================================
+   الديباجة (blockquote)
+   ============================================================== */
 blockquote {
-  border-right: 4px solid #0b3d2e; background: #f2f6f4;
-  margin: 0.6cm 0; padding: 0.35cm 0.7cm; color: #2a2a2a;
+  border-right: 4px solid #121212;
+  background: #f5f4f5;
+  margin: 0.6cm 0;
+  padding: 0.35cm 0.7cm;
+  color: #2a2a2a;
 }
 blockquote p { margin: 0; }
 blockquote p strong:first-child {
   display: block;
   padding-inline: 0;
-  color: #0b3d2e;
+  color: #121212;
   margin-bottom: 0.08cm;
 }
 
-/* ===== الجداول ===== */
+/* ==============================================================
+   الجداول
+   ============================================================== */
 table {
-  width: 100%; border-collapse: collapse; margin: 0.5cm 0;
-  page-break-inside: avoid; font-size: 11pt; direction: rtl;
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5cm 0;
+  page-break-inside: avoid;
+  font-size: 11pt;
+  direction: rtl;
 }
 th, td {
-  border: 1px solid #c2ccc8; padding: 6pt 9pt;
-  text-align: right; vertical-align: top;
-  word-wrap: break-word; overflow-wrap: break-word;
+  border: 1px solid #cccccc;
+  padding: 6pt 9pt;
+  text-align: right;
+  vertical-align: top;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
-thead th { background: #0b3d2e; color: #fff; font-weight: 700; }
-tbody tr:nth-child(even) { background: #f4f7f6; }
+thead th {
+  background: #121212;
+  color: #ffffff;
+  font-weight: 700;
+}
+tbody tr:nth-child(even) { background: #f5f4f5; }
 .docmeta td:first-child {
-  width: 34%; font-weight: 700; background: #eef2f1; color: #0b3d2e;
+  width: 34%;
+  font-weight: 700;
+  background: #f5f4f5;
+  color: #121212;
 }
 
-/* ===== الفواصل ===== */
-hr { border: none; border-top: 1px solid #d3dbd8; margin: 0.6cm 0; }
+/* ==============================================================
+   الفواصل
+   ============================================================== */
+hr { border: none; border-top: 1px solid #cccccc; margin: 0.6cm 0; }
