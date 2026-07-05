@@ -2,8 +2,6 @@
    قالب وثائق مشروع المستشار القانوني الذكي
    الهوية: #121212 (داكن) — #f5f4f5 (فاتح) — #121f38 (أزرق الشعار)
    محرّك: WeasyPrint — خط: Amiri
-   مدرسة بعقلية مصمّمين محترفين: خلفية بيضاء، شريط رفيع، شعار + عنوان + بيانات — كلها في صفحة واحدة
-   مرجع: ISO House Style · World Bank GPN · Legal document typography best practices
    آخر تحديث: 2026-07-05
    ============================================================= */
 
@@ -14,8 +12,6 @@
   size: A4;
   margin: 2.4cm 2cm 2cm 2cm;
 
-  /* ترويسة: شعار (يمين) — مُعرّف الوثيقة (وسط) — التصنيف (يسار)
-     الشعار يظهر تلقائياً في كل صفحة عبر content: url("logo-header.svg") */
   @top-right {
     content: url("logo-header.svg");
     vertical-align: middle;
@@ -72,27 +68,14 @@ body {
 .rh-class.ts  { color: #b00020; font-weight: 700; }
 
 /* ==============================================================
-   صفحة الغلاف — تصميم محترف
-   مستوحى من: ISO/IEC cover pages, World Bank report covers, legal firm documents
-
-   البنية:
-   ─ شريط داكن رفيع (0.6cm) في أعلى الصفحة
-   ─ شعار المشروع (لون العلامة #121f38) — 3.5cm ارتفاع
-   ─ خط فاصل رفيع تحت الشعار
-   ─ عنوان الوثيقة (كبير)
-   ─ العنوان الفرعي
-   ─ مساحة بيضاء (تنفّس بصري)
-   ─ بيانات الوثيقة (مضغوطة، خط فاصل فوقها) — أسفل الصفحة
-   ─ التاريخ بخط أصغر
-
-   تحساب المسافات لضمان صفحة واحدة للغلاف (A4 = 29.7cm، margin: 0):
-   - border-top 0.6cm
-   - ::before logo area: 1cm margin + 5cm height = 6cm → مجموع: 6.6cm
-   - .title: 2cm margin + ~2cm content → 10.6cm
-   - .subtitle: 0.6cm + ~0.9cm → 12.1cm
-   - .author: 10cm margin + ~2cm content → 24.1cm
-   - .date: 0.4cm + ~0.5cm + 1.5cm padding → 26.5cm
-   → مجموع: 26.5cm ≠ تجاوز (29.7cm ─ 26.5cm = 3.2cm بيضاء في الأسفل) ✓
+   صفحة الغلاف
+   حساب المسافات (A4 = 29.7cm، margin: 0):
+   - logo area: 1cm margin + 5cm height = 6cm
+   - .title: 2cm margin + ~1.5cm = 9.5cm
+   - .subtitle: 0.6cm + ~1cm = 11.1cm
+   - .author: 6cm margin + ~4.2cm = 21.3cm
+   - .date: 0.4cm + ~2.5cm = 24.2cm
+   → يسع الغلاف كله في صفحة واحدة ✓
    ============================================================== */
 #title-block-header {
   page: cover;
@@ -101,11 +84,10 @@ body {
   padding: 0;
   margin: 0;
   background: #ffffff;
-  /* شريط العلامة الداكن في أعلى الصفحة — بديل احترافي عن الخلفية الكاملة */
-  border-top: 0.6cm solid #121212;
+  /* لا border-top — تمّ حذف الشريط الأسود */
 }
 
-/* مساحة الشعار — مركّز في الثلث العلوي من الصفحة */
+/* مساحة الشعار */
 #title-block-header::before {
   content: "";
   display: block;
@@ -136,10 +118,9 @@ body {
   padding: 0 2.5cm;
 }
 
-/* بيانات الوثيقة (doc_id, version, approved_by)
-   margin-top كبير يدفعها إلى أسفل الصفحة */
+/* بيانات الوثيقة — margin-top مخفَّض لضمان بقاء الكل في صفحة واحدة */
 #title-block-header .author {
-  margin-top: 10cm;
+  margin-top: 6cm;
   font-size: 10pt;
   color: #444444;
   line-height: 1.9;
@@ -177,7 +158,7 @@ nav#TOC a  { text-decoration: none; color: #1c1c1c; }
 nav#TOC ul ul { padding-right: 1cm; font-size: 11pt; color: #555555; }
 
 /* ==============================================================
-   العناوين — تدفّق متّصل بلا صفحات مُهدَرة
+   العناوين
    ============================================================== */
 h1, h2, h3 { font-family: "Amiri", serif; }
 h1 {
@@ -211,16 +192,14 @@ h3 {
 .docmeta h2:first-child { margin-top: 0; }
 
 /* ==============================================================
-   الفقرات والمواد — إصلاح تداخل الغامق (طبقتان)
+   الفقرات والمواد
    ============================================================== */
 p { margin: 0.28cm 0; }
 
-/* طبقة ١: شبكة أمان CSS — تباعدٌ جانبي يمنع التصاق كلمات */
 p strong, li strong, td strong, blockquote p strong {
   padding-inline: 0.12em;
 }
 
-/* طبقة ٢: عنوان المادة (أول غامق) — سطر مستقل */
 p strong:first-child,
 li strong:first-child,
 blockquote p strong:first-child {
