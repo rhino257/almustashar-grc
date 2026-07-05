@@ -1,7 +1,10 @@
 /* =============================================================
    قالب وثائق مشروع المستشار القانوني الذكي
-   الهوية البصرية: #121212 (داكن) — #f5f4f5 (فاتح) — #121f38 (أزرق الشعار)
-   المحرّك: WeasyPrint — الخط: Amiri — آخر تحديث: 2026-07-05
+   الهوية: #121212 (داكن) — #f5f4f5 (فاتح) — #121f38 (أزرق الشعار)
+   محرّك: WeasyPrint — خط: Amiri
+   مدرسة بعقلية مصمّمين محترفين: خلفية بيضاء، شريط رفيع، شعار + عنوان + بيانات — كلها في صفحة واحدة
+   مرجع: ISO House Style · World Bank GPN · Legal document typography best practices
+   آخر تحديث: 2026-07-05
    ============================================================= */
 
 /* ==============================================================
@@ -11,7 +14,8 @@
   size: A4;
   margin: 2.4cm 2cm 2cm 2cm;
 
-  /* ترويسة: شعار (يمين) — مُعرّف الوثيقة (وسط) — التصنيف (يسار) */
+  /* ترويسة: شعار (يمين) — مُعرّف الوثيقة (وسط) — التصنيف (يسار)
+     الشعار يظهر تلقائياً في كل صفحة عبر content: url("logo-header.svg") */
   @top-right {
     content: url("logo-header.svg");
     vertical-align: middle;
@@ -26,15 +30,18 @@
   }
   @bottom-center {
     content: "صفحة " counter(page) " من " counter(pages);
-    font-family: "Amiri", serif; font-size: 9pt; color: #888888;
+    font-family: "Amiri", serif;
+    font-size: 9pt;
+    color: #888888;
   }
 }
 
+/* صفحة الغلاف: بلا ترويسة أو ترقيم */
 @page cover {
   margin: 0;
-  @top-right  { content: none; }
-  @top-center { content: none; }
-  @top-left   { content: none; }
+  @top-right   { content: none; }
+  @top-center  { content: none; }
+  @top-left    { content: none; }
   @bottom-center { content: none; }
 }
 
@@ -55,16 +62,37 @@ body {
    حاقنَا الترويسة الديناميكية
    ============================================================== */
 .rh-id, .rh-class {
-  font-family: "Amiri", serif; font-size: 8pt; color: #9aa5a1;
+  font-family: "Amiri", serif;
+  font-size: 8pt;
+  color: #9aa5a1;
 }
-.rh-id   { position: running(rhId); }
+.rh-id    { position: running(rhId); }
 .rh-class { position: running(rhClass); }
 .rh-class.sec { color: #8a6d00; font-weight: 700; }
 .rh-class.ts  { color: #b00020; font-weight: 700; }
 
 /* ==============================================================
-   صفحة الغلاف
-   تصميم: قسم داكن علوي (12cm) بشعار أبيض + قسم فاتح سفلي لبيانات الوثيقة
+   صفحة الغلاف — تصميم محترف
+   مستوحى من: ISO/IEC cover pages, World Bank report covers, legal firm documents
+
+   البنية:
+   ─ شريط داكن رفيع (0.6cm) في أعلى الصفحة
+   ─ شعار المشروع (لون العلامة #121f38) — 3.5cm ارتفاع
+   ─ خط فاصل رفيع تحت الشعار
+   ─ عنوان الوثيقة (كبير)
+   ─ العنوان الفرعي
+   ─ مساحة بيضاء (تنفّس بصري)
+   ─ بيانات الوثيقة (مضغوطة، خط فاصل فوقها) — أسفل الصفحة
+   ─ التاريخ بخط أصغر
+
+   تحساب المسافات لضمان صفحة واحدة للغلاف (A4 = 29.7cm، margin: 0):
+   - border-top 0.6cm
+   - ::before logo area: 1cm margin + 5cm height = 6cm → مجموع: 6.6cm
+   - .title: 2cm margin + ~2cm content → 10.6cm
+   - .subtitle: 0.6cm + ~0.9cm → 12.1cm
+   - .author: 10cm margin + ~2cm content → 24.1cm
+   - .date: 0.4cm + ~0.5cm + 1.5cm padding → 26.5cm
+   → مجموع: 26.5cm ≠ تجاوز (29.7cm ─ 26.5cm = 3.2cm بيضاء في الأسفل) ✓
    ============================================================== */
 #title-block-header {
   page: cover;
@@ -72,52 +100,61 @@ body {
   text-align: center;
   padding: 0;
   margin: 0;
+  background: #ffffff;
+  /* شريط العلامة الداكن في أعلى الصفحة — بديل احترافي عن الخلفية الكاملة */
+  border-top: 0.6cm solid #121212;
 }
 
-/* القسم الداكن العلوي — خلفية #121212 + شعار أبيض مركّز */
+/* مساحة الشعار — مركّز في الثلث العلوي من الصفحة */
 #title-block-header::before {
   content: "";
   display: block;
-  background-color: #121212;
-  height: 12cm;
-  background-image: url("logo-white.svg");
+  height: 5cm;
+  margin-top: 1cm;
+  background-image: url("logo.svg");
   background-repeat: no-repeat;
-  background-position: center 3.5cm;
-  background-size: auto 5cm;
+  background-position: center center;
+  background-size: auto 3.5cm;
 }
 
-/* العنوان — أسود على فاتح */
+/* عنوان الوثيقة */
 #title-block-header .title {
   margin-top: 2cm;
-  font-size: 26pt;
+  font-size: 24pt;
   font-weight: 700;
   color: #121212;
-  line-height: 1.4;
-  padding: 0 2.5cm;
+  line-height: 1.35;
+  padding: 0 2cm;
 }
+
 /* العنوان الفرعي */
 #title-block-header .subtitle {
-  margin-top: 0.7cm;
-  font-size: 13pt;
+  margin-top: 0.6cm;
+  font-size: 12pt;
   color: #555555;
-  line-height: 1.7;
+  line-height: 1.6;
   padding: 0 2.5cm;
 }
-/* بيانات الوثيقة (doc_id · version · approved_by) */
+
+/* بيانات الوثيقة (doc_id, version, approved_by)
+   margin-top كبير يدفعها إلى أسفل الصفحة */
 #title-block-header .author {
-  margin-top: 2.5cm;
-  font-size: 11pt;
+  margin-top: 10cm;
+  font-size: 10pt;
   color: #444444;
-  line-height: 2.1;
-  padding: 0.6cm 3cm 0;
+  line-height: 1.9;
+  padding: 0.5cm 3cm 0;
   border-top: 1px solid #dddddd;
+  text-align: right;
 }
+
 /* التاريخ */
 #title-block-header .date {
-  margin-top: 0.5cm;
+  margin-top: 0.4cm;
   font-size: 10pt;
-  color: #888888;
-  padding-bottom: 1.5cm;
+  color: #777777;
+  padding: 0 3cm 1.5cm;
+  text-align: right;
 }
 
 /* ==============================================================
@@ -178,12 +215,12 @@ h3 {
    ============================================================== */
 p { margin: 0.28cm 0; }
 
-/* طبقة ١: شبكة أمان CSS — تباعدٌ جانبي يمنع التصاق كلمات في WeasyPrint RTL */
+/* طبقة ١: شبكة أمان CSS — تباعدٌ جانبي يمنع التصاق كلمات */
 p strong, li strong, td strong, blockquote p strong {
   padding-inline: 0.12em;
 }
 
-/* طبقة ٢: عنوان المادة (أول كلمة غامقة) — سطر مستقل */
+/* طبقة ٢: عنوان المادة (أول غامق) — سطر مستقل */
 p strong:first-child,
 li strong:first-child,
 blockquote p strong:first-child {
