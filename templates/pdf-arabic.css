@@ -1,4 +1,5 @@
 /* قالب موحّد للطباعة الاحترافية للعربية (محرّك WeasyPrint) — يصلح لكل وثائق المستودع */
+/* آخر تحديث: 2026-07-05 — إضافة شعار الغلاف + إصلاح تداخل الغامق المضمَّن */
 
 @page {
   size: A4;
@@ -48,9 +49,15 @@ body {
   text-align: center;
   padding: 0 2.5cm;
   border-top: 1.4cm solid #0b3d2e;
+  /* شعار المشروع — يظهر أعلى الغلاف بعد الشريط الأخضر مباشرةً */
+  background-image: url("logo.svg");
+  background-repeat: no-repeat;
+  background-position: center 1.6cm;
+  background-size: 5.5cm auto;
 }
 #title-block-header .title {
-  margin-top: 9cm; font-size: 32pt; font-weight: 700;
+  /* أُخِّر العنوان للأسفل لمنح مساحةٍ للشعار (كانت 9cm قبل الشعار) */
+  margin-top: 5.5cm; font-size: 32pt; font-weight: 700;
   color: #0b3d2e; line-height: 1.4;
 }
 #title-block-header .subtitle {
@@ -102,22 +109,31 @@ h3 {
 
 /* ===== الفقرات والمواد ===== */
 p { margin: 0.28cm 0; }
-/* عنوان المادة الغامق يُعرض في سطرٍ مستقلٍّ فوق نصّه — الحل المضمون لمنع تداخل الكلمات في تصيير RTL بمحرك WeasyPrint */
-p strong:first-child {
-  display: block;
-  color: #0b3d2e;
-  margin-bottom: 0.1cm;
+
+/*
+  إصلاح تداخل الغامق — طبقتان:
+  ١) قاعدة أسلوبية: يُقصر الغامق على عناوين المواد في بداية السطر فقط
+     (مُوثَّق في STYLE_GUIDE.md — القاعدة و).
+  ٢) شبكة أمان CSS: تباعدٌ جانبي خفيف على أي strong مضمَّن
+     لمنع التصاق الكلمات في تصيير WeasyPrint RTL.
+*/
+
+/* شبكة الأمان: تباعدٌ جانبي على الغامق المضمَّن في السطر */
+p strong,
+li strong,
+td strong,
+blockquote p strong {
+  padding-inline: 0.12em;
 }
-li strong:first-child {
-  display: block;
-  color: #0b3d2e;
-  margin-bottom: 0.06cm;
-}
-/* الديباجة (داخل الاقتباس): عنوانها في سطر مستقل أيضاً لمنع التداخل */
+
+/* التسمية في بداية السطر (display:block) — بلا تباعد جانبي */
+p strong:first-child,
+li strong:first-child,
 blockquote p strong:first-child {
   display: block;
+  padding-inline: 0;
   color: #0b3d2e;
-  margin-bottom: 0.08cm;
+  margin-bottom: 0.1cm;
 }
 
 /* ===== الاقتباس (الديباجة) ===== */
@@ -126,6 +142,12 @@ blockquote {
   margin: 0.6cm 0; padding: 0.35cm 0.7cm; color: #2a2a2a;
 }
 blockquote p { margin: 0; }
+blockquote p strong:first-child {
+  display: block;
+  padding-inline: 0;
+  color: #0b3d2e;
+  margin-bottom: 0.08cm;
+}
 
 /* ===== الجداول ===== */
 table {
