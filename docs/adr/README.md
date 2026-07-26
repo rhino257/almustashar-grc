@@ -24,3 +24,5 @@
 | [0009](ADR-0009-walking-skeleton-mock-repositories.md) | الهيكل السائر عبر mock repositories | Accepted |
 | [0010](ADR-0010-evolutionary-platform-architecture.md) | المعمارية التطوّرية للمنصّة | Accepted |
 | [0011](ADR-0011-three-repos-auth-slice-first.md) | ثلاثة مستودعات منفصلة والبدء بشريحة المصادقة | Accepted |
+| [0012](ADR-0012-observability-foundation-dependencies.md) | أساس الرصد والمراقبة: التبعيات المعتمدة (structlog وOpenTelemetry) | Accepted |
+| [0013](ADR-0013-cicd-quality-gate-pipeline.md) | خط تحقّق الجودة في CI/CD وضوابط الأمن | Accepted |
