@@ -1,138 +1,49 @@
-# المستشار القانوني الذكي (Al-Mustashar)
+# المستشار القانوني الذكي (Al-Mustashar) — دليل المواصفات (docs/)
 
-مساعدٌ قانونيٌّ ذكيّ يعمل محلياً (On-Prem) عبر RAG، يجيب بالعربية مسنَداً
-بالنصوص القانونية اليمنية والشريعة الإسلامية، موجّهٌ للعموم
-(مواطن/محامٍ/قاضٍ/باحث).
+مساعدٌ قانونيٌّ ذكيّ يعمل محلياً (On-Prem) عبر RAG، يجيب بالعربية مسنَداً بالنصوص القانونية اليمنية والشريعة الإسلامية، موجّهٌ للعموم (مواطن/محامٍ/قاضٍ/باحث).
+
+> هذا المجلد (`docs/`) جزءٌ من مستودع الحوكمة `almustashar-grc` (توثيقٌ فقط)، ويحوي المواصفات التقنية المحكومة. أمّا شيفرة التطبيق فموزّعة على مستودعين منفصلين (راجع ADR-0011): الباك اند `almustashar_backend` والواجهة `almustashar`.
 
 ## تنويه الحياد
-يعمل التطبيق في بيئةٍ ذات مرجعيتين تشريعيتين. الحياد السياسي التام **طبقة
-فحصٍ مستقلة** لا مجرّد تعليمة، وتُعرض النسختان (الأصلية والمعدّلة) بالتساوي.
+يعمل التطبيق في بيئةٍ ذات مرجعيتين تشريعيتين. الحياد السياسي التام **طبقة فحصٍ مستقلة** لا مجرّد تعليمة، وتُعرض النسختان (الأصلية والمعدّلة) بالتساوي.
 
-## الحزمة التقنية
+## الحزمة التقنية (البنية المستهدفة)
 | الطبقة | التقنية |
 | --- | --- |
 | الواجهة | Flutter (mobile-first) |
 | الخادم | FastAPI + LangGraph |
-| النموذج | Gemma 4 31B (QAT 4-bit) |
+| التحليل والتوليد | Gemma 4 (QAT 4-bit) |
+| إعادة الترتيب | Gemma 4 |
+| التضمين | jina-v5 (ذاتي الاستضافة) |
 | التشغيل | vLLM (إنتاج) / Ollama (تطوير) |
-| التضمين | EmbeddingGemma (ترجمة النص إلى الإنجليزية ثم التضمين) |
-| إعادة الترتيب | jina-reranker-v3 |
-| قاعدة البيانات | PostgreSQL + pgvector (self-hosted) |
-| الاسترجاع | Hybrid (Dense + Lexical) + RRF + HyDE |
+| قاعدة البيانات | PostgreSQL 16 + pgvector (ذاتي الاستضافة) |
+| الاسترجاع | هجين (Dense + Lexical) مع RRF |
 
-## بنية المستودع
-​
-.
--- backend/            # FastAPI + LangGraph (RAG pipeline)
-`-- .env.example
--- frontend/           # Flutter app
-`-- pubspec.yaml
--- docs/               # governed specs
-`-- api-contract.md         # ARC-API-001
--- docker-compose.yml  # postgres + pgvector
-`-- README.md
+## حالة التنفيذ
+- 🟢 **مطبّق (M0):** شريحة المصادقة (تسجيل/دخول/OTP/جلسات/سياسات وموافقات) في `almustashar_backend`، مع عزل صفوف (RLS) وبنية رصد (observability) وخطّ CI.
+- 🟡 **تصميم مستهدف:** المحادثة والبثّ (SSE)، والذاكرة والتفضيلات والمرفقات، وقاعدة المعرفة والاسترجاع (RAG) — موثّقة كمرجعٍ للبناء وفق الضوابط.
 
-## المتطلّبات المسبقة
-- Python 3.11+ و Flutter 3.x
-- Docker (لتشغيل Postgres + pgvector)
-- GPU: NVIDIA H100 80GB (للإنتاج عبر vLLM)
+## فهرس المواصفات (docs/)
+| الوثيقة | المعرّف | الوصف |
+| --- | --- | --- |
+| [`architecture.md`](architecture.md) | ARC-DESIGN-001 | البنية العامة للنظام |
+| [`data-model.md`](data-model.md) | ARC-DATA-001 | نموذج البيانات ومخطّط قاعدة البيانات |
+| [`api-contract.md`](api-contract.md) | ARC-API-001 | عقد الواجهة البرمجية (REST/SSE) |
+| [`rag-pipeline-spec.md`](rag-pipeline-spec.md) | ARC-RAG-001 | خطّ أنابيب الاسترجاع والتوليد |
+| [`system-prompt.md`](system-prompt.md) | ARC-PROMPT-001 | موجّه النظام وضوابطه |
+| [`frontend-spec.md`](frontend-spec.md) | — | مواصفات الواجهة (Flutter) |
+| [`design-language.md`](design-language.md) | — | لغة التصميم والهوية البصرية |
+| [`HANDOFF.md`](HANDOFF.md) | — | دليل التسليم للفريق |
+| [`adr/`](adr/) | — | سجلّات قرارات البنية (ADR-0001 … ADR-0013) |
 
-## الإعداد والتشغيل
-### 1) قاعدة البيانات
-​
-docker compose up -d postgres
-extensions: pgcrypto, vector, pg_trgm (created by migrations)
+## الحوكمة
+السياسات والمعايير والسجلّات ضمن هذا المستودع:
+- `01-policies/` — السياسات (مثل سياسة أمن المعلومات POL-POLICY-001).
+- `02-standards/` — المعايير (مثل معيار التشفير SEC-CRYPTO-001).
+- `08-ai-governance/` — حوكمة الذكاء الاصطناعي (الضوابط والتقييم).
+- `docs/adr/` — سجلّات القرارات المعمارية.
 
-### 2) تشغيل النموذج
-​
-production (vLLM, OpenAI-compatible):
-vllm serve google/gemma-4-31B-it-qat --quantization awq --port 8001
-development (Ollama):
-ollama run gemma4:31b
+يخضع الإطار لمتطلّبات PDPL و NCA، ويُبنى نحو ISO/IEC 27001 و ISO/IEC 42001.
 
-### 3) الخادم (backend)
-​
-cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env        # then fill values
-alembic upgrade head        # create schema
-uvicorn app.main:app --reload --port 8000
-
-### 4) الواجهة (frontend)
-​
-cd frontend
-flutter pub get
-flutter run
-
-## متغيّرات البيئة
-انسخ `backend/.env.example` إلى `backend/.env` واملأ القيم. لا تُودِع
-`.env` في Git إطلاقاً.
-
-## التوثيق
-المواصفات المحكومة في `docs/`. الحوكمة (السياسات والمعايير والسجلّات)
-في مستودع الحوكمة المنفصل `almustashar-grc`.
-
-## الترخيص والحوكمة
-استخدامٌ داخليّ ضمن الشراكة. يخضع لإطار الحوكمة في `almustashar-grc`
-(PDPL، NCA، ISO 42001).
-​
- بطاقة إنشاء الملف (2)
-الحقل
-القيمة
-المستودع
-مستودع التطبيق
-المسار
-backend/.env.example
-الفرع
-draft/repo-bootstrap
-رسالة الـ commit
-chore(config): add backend .env.example template
-# ============================================================
-#  Al-Mustashar backend - environment template
-#  Copy to .env and fill values. NEVER commit the real .env.
-# ============================================================
-
-# --- Application ---
-APP_ENV=development            # development | production
-APP_HOST=0.0.0.0
-APP_PORT=8000
-API_VERSION=v1
-CORS_ALLOWED_ORIGINS=http://localhost:3000
-
-# --- Database (self-hosted Postgres + pgvector) ---
-DATABASE_URL=postgresql+asyncpg://almustashar:password@localhost:5432/almustashar
-DB_POOL_SIZE=10
-
-# --- LLM serving (OpenAI-compatible endpoint) ---
-LLM_BASE_URL=http://localhost:8001/v1
-LLM_MODEL=google/gemma-4-31B-it-qat
-LLM_API_KEY=not-needed-for-local
-GENERATOR_MAX_TOKENS=1024
-
-# --- Analyzer (Model-1). MVP: same model as generator ---
-ANALYZER_MODEL=google/gemma-4-31B-it-qat
-ANALYZER_MAX_TOKENS=256
-
-# --- Embeddings (translate-then-embed strategy) ---
-EMBEDDING_BASE_URL=http://localhost:8002
-EMBEDDING_MODEL=google/embeddinggemma-300m
-EMBEDDING_DIM=1024             # MUST match legal_chunks.embedding dimension
-
-# --- Reranker ---
-RERANKER_MODEL=jinaai/jina-reranker-v3
-RETRIEVE_TOP_K=50              # per list
-FUSE_TOP_K=100                # candidates after RRF
-RRF_K=60                      # RRF constant
-RERANKER_TOP_N=15             # final context size
-
-# --- Crypto (CryptoService). MVP: NullCipher ---
-CIPHER_PROVIDER=null          # null | aes_gcm
-CIPHER_KEY=                   # base64 32-byte key, required when aes_gcm
-
-# --- Concurrency / queue ---
-MAX_CONCURRENT_REQUESTS=50
-QUEUE_TIMEOUT_SECONDS=30
-
-# --- Security / logging ---
-LOG_PII=false                 # never log message content / phone
+## الترخيص والاستخدام
+استخدامٌ داخليّ ضمن الشراكة، خاضعٌ لإطار الحوكمة في `almustashar-grc`.
