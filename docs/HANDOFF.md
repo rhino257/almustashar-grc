@@ -36,7 +36,7 @@
 - **عقد الـ API** → `docs/api-contract.md` (v0.3.1، ARC-API-001)
 - **خط أنابيب RAG** → `docs/rag-pipeline-spec.md` (v0.2)
 - **الـ prompts** → `docs/system-prompt.md` (v0.2)
-- **معيار التشفير** → `docs/cryptography-standard.md` (v0.2)
+- **معيار التشفير** → `02-standards/cryptography-standard.md` (STD-STD-001 v0.3)
 - **قرارات المعمارية** → `docs/adr/` (ADR-0001 … ADR-0011)
 
 ## 4) القرارات الكبرى (اقرأ الـ ADRs)
